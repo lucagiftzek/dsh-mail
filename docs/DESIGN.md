@@ -95,3 +95,9 @@ Timer tick (every 30s)
 - The sidebar tab provides human review (Send-now / Cancel)
 - All API routes require the trust fence + capability token
 - Credentials are never sent to the browser in plaintext (masked in /state)
+- Credential sources (read-only, merged at call time, settings win only when
+  non-empty): `~/.config/lettermint/credentials` → `lettermintApiKey`,
+  `~/.config/agentmail/credentials` → `agentmailApiKey` / `agentmailInbox`.
+  On this estate the populated Lettermint key originates from
+  `~/.config/erioun-prod/credentials` on Main (Erioun prod) and was copied
+  into the local lettermint credentials file; see README "Settings".

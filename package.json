@@ -1,7 +1,6 @@
 {
   "name": "dsh-mail",
   "version": "0.1.0",
-  "private": true,
   "description": "DSH plugin for agent email tools: send, mass send (CSV-personalised), send-later (scheduled queue), read/fetch inbox, list domains. Multi-provider: Lettermint, AgentMail, Resend, OVH (SMTP/IMAP), Manual SMTP+IMAP/POP, Local self-host (expert). Settings UI + sidebar tab + agent tools.",
   "type": "module",
   "main": "lib/index.js",
@@ -57,8 +56,12 @@
     "smtp",
     "imap"
   ],
-  "author": "built for Loukas \"Luca\" Tzekos",
+  "author": "Loukas \"Luca\" Tzekos",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/lucagiftzek/dsh-mail.git"
+  },
   "devDependencies": {
     "esbuild": "^0.28.2"
   }

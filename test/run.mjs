@@ -4,7 +4,8 @@
  * Run: node test/run.mjs
  */
 import { strict as assert } from 'node:assert'
-import { rmSync, mkdirSync, existsSync } from 'node:fs'
+import { rmSync, mkdirSync, existsSync, readFileSync } from 'node:fs'
+import { runInNewContext } from 'node:vm'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 import { homedir } from 'node:os'
@@ -137,6 +138,22 @@ await atest('secret creation + token mint + verify', async () => {
   assert.ok(typeof token === 'string')
   assert.equal(verifyToken(secret, token).ok, true)
   assert.equal(verifyToken(secret, 'invalid-token').ok, false)
+})
+
+// The browser half must hand the loader { apply, inject }. An esbuild
+// format:'iife' build wraps everything in (()=>{...})(), module.exports stays
+// {} and the whole web UI fails: "expect function or object with an apply
+// method, received object".
+console.log('\nclient.js:')
+test('bundle exports apply() + inject through the ModuleLoader factory', () => {
+  let exported
+  const window = { __ModuleLoader__: { load: ({ id, factory }) => {
+    assert.equal(id, 'dsh-mail')
+    exported = factory((name) => name === 'react' ? {} : { jsx() {}, jsxs() {}, Fragment: 'F' })
+  } } }
+  runInNewContext(readFileSync(new URL('../lib/client.js', import.meta.url), 'utf8'), { window, console })
+  assert.equal(typeof exported?.apply, 'function')
+  assert.equal(JSON.stringify(exported.inject), '["betterSidebar"]')
 })
 
 // Cleanup

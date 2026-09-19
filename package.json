@@ -17,7 +17,7 @@
     "README.md"
   ],
   "scripts": {
-    "check": "for f in lib/index.js lib/providers.js lib/staging.js lib/security.js lib/agent.js; do node --check $f || exit 1; done && echo 'all files OK'",
+    "check": "for f in lib/index.js lib/providers.js lib/staging.js lib/security.js lib/client.js; do node --check $f || exit 1; done && node test/run.mjs",
     "build": "node scripts/build.mjs",
     "test": "node test/run.mjs"
   },

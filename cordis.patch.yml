@@ -1,0 +1,23 @@
+# dsh-mail bundle patch.
+#
+# Inserts ONE host row so the composition mounts this package. The node half
+# (exports ".") registers the email agent tools and API routes; the browser
+# half (lib/client.js, declared through package.json dsh.client) registers
+# the "Mail" tab on dsh-better-sidebar's public ctx.betterSidebar.registerTab
+# extension point.
+#
+# Install (this estate, after human sign-off):
+#   1. add  "dsh-mail": "link:/opt/stacks/llm/plugins/dsh-mail"
+#      to ~/.dsh/profiles/web/package.json dependencies
+#   2. append  dsh-mail  to dsh.profile.bundles
+#   3. pnpm install  in ~/.dsh/profiles/web
+#   4. restart dsh-web  (ask the human first: the live chat session runs inside it)
+#
+# KILL SWITCH without uninstalling: add to ~/.dsh/profiles/web/cordis.patch.yml
+#     - id: dsh-mail
+#       disabled: true
+#   and restart dsh-web. Runtime kill switch without a restart:
+#   DSH_MAIL_DISABLE=1 in the dsh-web environment (read at apply time).
+- insert:
+    - id: dsh-mail
+      name: 'dsh-mail'

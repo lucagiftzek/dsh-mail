@@ -457,6 +457,15 @@ src/*.jsx              browser half (Mail tab, accounts editor)
 
 See [docs/DESIGN.md](docs/DESIGN.md) for the design notes.
 
+## When something goes wrong
+
+- Ask your agent to load the **`mail-doctor`** skill (bundled in `skills/`; see
+  [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md#start-here) if it is not listed). If your
+  version does not register it yet, copy it once:
+  `P=$(node -p "require('path').dirname(require.resolve('dsh-mail/package.json',{paths:[(process.env.DSH_HOME||require('os').homedir()+'/.dsh')+'/profiles/web']}))"); mkdir -p "${DSH_HOME:-$HOME/.dsh}/skills" && cp -r "$P/skills/mail-doctor" "${DSH_HOME:-$HOME/.dsh}/skills/"`
+- Run the self-check: `GET /dsh-mail/api/doctor` (offline, no secrets in the output), or the agent tool `mail_doctor`.
+- Every error carries a stable `code`: [docs/ERRORS.md](docs/ERRORS.md).
+
 ---
 
 Built by Luca Tzekos, who also makes [**Job Opportunities API**](https://jobopportunitiesapi.org): employer-direct job data with per-field provenance you can verify yourself, free to read and available as an API. If this plugin is useful to you, a star on this repo or a look at [jobopportunitiesapi.org](https://jobopportunitiesapi.org) is the best thanks.

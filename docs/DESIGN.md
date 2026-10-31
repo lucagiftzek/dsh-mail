@@ -6,9 +6,13 @@
   the cache, HTTP routes under `/dsh-mail/api`, timers and the agent tools.
 - **Browser half** (`src/*.jsx`, bundled by `scripts/build.mjs` into
   `lib/client.js`): the Mail sidebar tab (dsh-better-sidebar) and the "Mail"
-  section of DSH Settings (`settings.section` slot). The build verifies the
-  bundle through a stub ModuleLoader (exports `apply` + `inject`, no
-  `@deepseek-ai/*` values, size budget 120 KB) before replacing the live file.
+  section of DSH Settings (`settings.section` slot). The only required inject
+  is the core `slots` service; the sidebar is requested with
+  `ctx.inject(['betterSidebar'], ...)`, because an unmet required inject keeps
+  the whole web client from booting on DSH 0.2. The build verifies the bundle
+  through a stub ModuleLoader (exports `apply` + `inject: ['slots']`, apply()
+  boots on a host without the sidebar, no `@deepseek-ai/*` values, size
+  budget 120 KB) before replacing the live file.
 
 ## Settings
 
@@ -62,6 +66,18 @@ known secret value.
 `lib/staging.js` keeps queue entries as JSON files. The timer sends only
 `scheduled` entries whose time has come; `queued` entries wait for the tab.
 Agent drafts live in `lib/drafts.js` and show up in the same pane.
+No duplicate sends: one timer pass at a time, one send per entry at a time
+(a second Send now answers 409), a single entry is marked `sending` before
+delivery, and a mass send appends every delivered address to the sidecar
+`<id>.sent`, so a retried or resumed batch (circuit breaker, restart) skips
+them. Cancelling an entry stops a running batch before the next message.
+
+IMAP drafts: every autosave APPENDs a new copy with `\Draft` and removes the
+previous one through `deleteDraftCopy`, which only touches a message that
+still has `\Draft` and our Message-ID; with UIDPLUS it is expunged by UID,
+without UIDPLUS it is only flagged `\Deleted` (a plain EXPUNGE would also
+remove other clients' deleted messages). Without APPENDUID the new copy is
+found by its Message-ID.
 
 ## OAuth2 (phase 2)
 
@@ -88,8 +104,11 @@ secret, info "dsh-mail unsubscribe v1"; payload account, list, campaign,
 128-bit recipient hash). Campaign records (`campaigns/c-*.json`, 0600) hold the
 hash to address map and never leave the host. The public page handler is
 pure apart from the suppression writes, so the DSH route and the optional
-listener share it; the client key for the rate limiter is the first
-X-Forwarded-For hop (the edge) or the peer. Unsubscribe replies are found in
+listener share it. The handler never throws (a malformed URL answers 400 or
+404; an exception in the plain http listener would be uncaught), and the
+listener only binds a loopback address. The client key for the rate limiter
+is CF-Connecting-IP, else the LAST X-Forwarded-For entry (the one the single
+trusted edge appended), else the peer. Unsubscribe replies are found in
 the rows that a sync adds (`onNewMessages`), deduplicated through a persisted
 seen set. `lib/idle.js` keeps one IDLE connection per push account outside
 the pool; an EXISTS triggers a forced sync. Sync now issues NOOP and always

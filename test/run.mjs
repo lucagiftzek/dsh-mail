@@ -7,6 +7,7 @@
  * settings block, the route security tests and the end-to-end test against a
  * local in-memory IMAP + SMTP server (hoodiecrow-imap) and a local POP3 fake.
  */
+import './isolate.mjs' // FIRST: no test may read a real credential file of this machine
 import { strict as assert } from 'node:assert'
 import { rmSync, readFileSync, mkdtempSync, writeFileSync, mkdirSync } from 'node:fs'
 import { runInNewContext } from 'node:vm'
@@ -164,8 +165,16 @@ await test('bundle exports apply() + inject through the ModuleLoader factory', (
   const window = { __ModuleLoader__: { load: ({ id, factory }) => { assert.equal(id, 'dsh-mail'); exported = factory(name => (name === 'react' ? {} : { jsx() {}, jsxs() {}, Fragment: 'F' })) } } }
   runInNewContext(readFileSync(new URL('../lib/client.js', import.meta.url), 'utf8'), { window, console })
   assert.equal(typeof exported?.apply, 'function')
-  assert.equal(JSON.stringify(exported.inject), '["betterSidebar","slots"]')
+  assert.equal(JSON.stringify(exported.inject), '["slots"]', 'only the core slots service is a required inject')
+  // a host without dsh-better-sidebar boots (no throw), and the tab is requested optionally
+  const asked = []
+  const base = { effect: fn => fn(), slots: { inject: (_n, f) => f(), register: () => () => {} } }
+  exported.apply({ ...base })
+  exported.apply({ ...base, inject: (deps, cb) => { asked.push(deps.join(',')); cb({ ...base }) } })
+  assert.deepEqual(asked, ['betterSidebar'])
 })
+
+await import('./review.test.mjs')
 
 await import('./accounts.test.mjs')
 await import('./routes.test.mjs')

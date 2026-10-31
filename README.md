@@ -247,7 +247,10 @@ confirm page (address masked, "this list" or "all mail") and POST (the form or
 the one-click POST) with 200. It verifies the HMAC, is rate limited (20 per
 minute per client, 600 in total), sends no referrer, a strict CSP and noindex.
 It is served by DSH and, with `unsubscribe.listenPort`, by a small separate
-listener (default 127.0.0.1) that serves nothing else. **The edge route is
+listener that serves nothing else and only ever binds a loopback address
+(`unsubscribe.listenHost` 127.0.0.1 or ::1; any other value falls back to
+127.0.0.1). The rate limit keys on `CF-Connecting-IP` or the last
+`X-Forwarded-For` entry, the one your edge appends. **The edge route is
 not created by the plugin.** Expose only that path without login, for example
 with Caddy:
 
@@ -277,9 +280,16 @@ apply with `confirm: true`).
 - **Search** uses an SQLite FTS5 index over subject, sender, recipients and
   cached text (word prefixes, accents ignored); `from:` `subject:` and the
   other operators still apply.
-- **Compose** in plain text, Markdown or rich text. HTML is sanitised and sent
-  together with a text part. Drafts save every 5 s and, for IMAP accounts, are
-  kept in the Drafts folder (the previous copy is replaced).
+- **Compose** in plain text, Markdown or rich text. Generated HTML (Markdown,
+  rich editor) is sanitised and sent together with a text part; an explicit
+  `html` part passed to `mail_send` goes out as given, as in v0.1. Drafts save
+  every 5 s and, for IMAP accounts, are kept in the Drafts folder: the previous
+  copy is replaced, and only a message that still carries `\Draft` and the
+  plugin's own Message-ID is ever removed (on servers without UIDPLUS it is
+  flagged deleted instead of expunged, so other deleted mail is untouched).
+- **No duplicate sends:** a queue entry is sent by one worker at a time, and a
+  mass send that stopped (circuit breaker, restart, cancel) resumes from where
+  it was: addresses already delivered are skipped.
 - **Undo send:** messages sent from the tab wait `compose.undoSendSec`
   seconds (default 6, 0 = off) with an Undo button. A restart in that window
   drops the message.
@@ -365,7 +375,14 @@ a body; HTML is converted to text.
 - HTML mail is sanitised on the host (no scripts, forms, frames or event
   handlers, remote images blocked until you ask) and shown in a sandboxed
   frame without script permission under a strict Content Security Policy.
+  Relative links are removed (they would point at the DSH origin).
 - Attachments download as attachments with `nosniff`; 25 MB cap.
+- HTTP API base URLs (Lettermint, Resend, AgentMail, SendGrid, Tzekos Mail)
+  must be https, or plain http to a loopback host, and never link-local; the
+  check runs on save and before Test connection. IMAP, POP3 and SMTP hosts are
+  free (self-hosted mail on the LAN is normal).
+- The browser half requires only the core `slots` service; the Mail tab is
+  added when dsh-better-sidebar is present, and a DSH without it still boots.
 - OAuth tokens are encrypted at rest (AES-256-GCM) and never leave the host;
   the sign-in state is signed, single use and bound to your browser session.
 - TLS certificates are verified unless an account opts in to

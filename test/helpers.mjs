@@ -3,6 +3,16 @@ import http from 'node:http'
 import { createHash } from 'node:crypto'
 import { mkdirSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
+import { assertLossless } from './lossless-check.mjs'
+
+/** Names of the tools whose execute() ran under the lossless check (coverage assertion in test/lossless.test.mjs). */
+export const losslessSeen = new Set()
+/** Every tool result is checked against DSH 0.2.1's lossless-JSON rule, so every existing tool test also guards it. */
+function checked(t) {
+  const execute = t.execute
+  if (typeof execute !== 'function') return t
+  return { ...t, execute: async function (...a) { const out = await execute.apply(this, a); await assertLossless(out, 'tool ' + t.name + ' result'); losslessSeen.add(t.name); return out } }
+}
 
 export async function bootPlugin({ dir, settings = {}, withDshSettings = null, extra = {}, strict = false, noSettingsFile = false, estateHome = null, mailboxCreds = null, config = {} }) {
   process.env.DSH_MAIL_DATA_DIR = join(dir, 'data')
@@ -18,7 +28,7 @@ export async function bootPlugin({ dir, settings = {}, withDshSettings = null, e
   const routes = []
   const disposers = []
   const base = {
-    tools: { register: t => tools.set(t.name, t) },
+    tools: { register: t => tools.set(t.name, checked(t)) },
     webServer: { register: r => { routes.push(r); return () => {} } },
     effect: (fn) => { const d = fn(); if (typeof d === 'function') disposers.push(d) },
     ...extra,

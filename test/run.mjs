@@ -176,6 +176,7 @@ await test('bundle exports apply() + inject through the ModuleLoader factory', (
 
 await import('./review.test.mjs')
 await import('./errors.test.mjs')
+await import('./doctor.test.mjs')
 
 await import('./accounts.test.mjs')
 await import('./routes.test.mjs')

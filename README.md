@@ -31,7 +31,7 @@ telemetry.
   with agent drafts. Keyboard: j / k, Enter, e, #, r, c, /.
 - **Agent tools**: every v0.1 tool keeps its name and arguments; new tools
   `mail_accounts`, `mail_folders`, `mail_search`, `mail_mark`, `mail_move`,
-  `mail_draft`, `mail_attachments`.
+  `mail_draft`, `mail_attachments`, `mail_doctor`.
 
 - **Google and Microsoft with OAuth2** (phase 2): bring your own OAuth client,
   authorization code + PKCE, XOAUTH2 for IMAP and SMTP, tokens encrypted at
@@ -364,6 +364,7 @@ injected), the plugin reads the row config, the old section and
 | `mail_move` | inbox, archive, trash, spam or a folder path (never deletes permanently) |
 | `mail_draft` | create, update, list, get, delete drafts (never sends) |
 | `mail_attachments` | list attachments or save one to disk (returns the path) |
+| `mail_doctor` | read-only self-check: settings mode, accounts (id and type only), secrets present (booleans), reauth flags, last sync, cache, file modes, unsubscribe and IDLE, queue counts; offline, no secrets |
 
 Tool output carries at most `agents.maxBodyChars` (default 8000) characters of
 a body; HTML is converted to text.
@@ -459,11 +460,11 @@ See [docs/DESIGN.md](docs/DESIGN.md) for the design notes.
 
 ## When something goes wrong
 
-- Ask your agent to load the **`mail-doctor`** skill (bundled in `skills/`; see
-  [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md#start-here) if it is not listed). If your
-  version does not register it yet, copy it once:
+- Ask your agent to load the **`mail-doctor`** skill. The plugin registers it when `dsh web` starts
+  (bundled in `skills/`; a copy of the same name in `~/.dsh/skills/` wins). If it is not listed
+  (older host, or the server half is not loaded), copy it once:
   `P=$(node -p "require('path').dirname(require.resolve('dsh-mail/package.json',{paths:[(process.env.DSH_HOME||require('os').homedir()+'/.dsh')+'/profiles/web']}))"); mkdir -p "${DSH_HOME:-$HOME/.dsh}/skills" && cp -r "$P/skills/mail-doctor" "${DSH_HOME:-$HOME/.dsh}/skills/"`
-- Run the self-check: `GET /dsh-mail/api/doctor` (offline, no secrets in the output), or the agent tool `mail_doctor`.
+- Run the self-check: `GET /dsh-mail/api/doctor` (offline, read-only, same access rules as the other read routes, no secrets in the output), or the agent tool `mail_doctor`. Rows and codes: [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md#start-here).
 - Every error carries a stable `code`: [docs/ERRORS.md](docs/ERRORS.md).
 
 ---

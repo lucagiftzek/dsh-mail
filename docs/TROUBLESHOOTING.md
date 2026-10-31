@@ -29,10 +29,27 @@ The doctor is offline and read-only: it never connects to a mail server and neve
 | 12 | Undo send did not catch the message, message vanished | dsh web restarted inside the undo window | [12](#t-undo-lost) |
 | 13 | A mail renders without images or looks plain | HTML is sanitised, remote images are blocked | [13](#t-html-rendering) |
 | 14 | The Mail tab is missing | Plugin not loaded, server half not restarted, optional sidebar missing | [14](#t-tab-missing) |
-| 15 | Doctor warns about permissions or the cache | Data directory not 0700, secrets not 0600, cache.db unreadable | [15](#t-data-files) |
+| 15 | Doctor warns about permissions or the cache | Data directory or a secrets file readable by group or others (expected 0700 and 0600), cache.db unreadable | [15](#t-data-files) |
 | C1 to C9 | Install problems common to DSH plugins | see the end of this page | [Common install problems](#common-install-problems-on-dsh) |
 
 ## 0. Collect facts (read-only, always safe)
+
+The report is `{ plugin, version, status, host, checks, docs, generatedAt }`. `status` is the worst check (`ok`, `warn` or `fail`); `host` has `dsh`, `dshLine`, `settingsMode` (`register` = 0.1.5, `forms` = 0.2.x, `config` = neither), `node` and `platform`. Each check is `{ id, label, status, detail, code, hint, docs, human }`: `status` is `ok`, `warn`, `fail`, `info` or `skip`; `code`, `hint` and `docs` (an anchor in [ERRORS.md](ERRORS.md)) are present on every row that is not ok; `human: true` marks a fix only you can do. Account rows show the id and the type only, never the address, the host or a secret.
+
+| Check id | What it looks at | Codes |
+|---|---|---|
+| `plugin` | version, capability secret ready | `MAIL_NOT_READY` |
+| `settings` | settings mode and writable | `MAIL_SETTINGS_UNAVAILABLE` |
+| `config` | `Config` on the default export (needed for the DSH 0.2.x form) | `MAIL_SETTINGS_UNAVAILABLE` |
+| `accounts` | number of accounts and how many are enabled | `MAIL_NO_ACCOUNTS` |
+| `account:<id>` | type, enabled, secret present (true or false), `needsReauth` (Google and Microsoft), last sync status and age, SendGrid inbound and webhook secret (booleans) | `MAIL_SECRET_MISSING`, `MAIL_OAUTH_REAUTH`, `MAIL_ACCOUNT_AUTH_FAILED`, `MAIL_CONNECT_FAILED`, `MAIL_MAILBOX_UNREACHABLE`, `MAIL_ACCOUNT_DISABLED` |
+| `agents` | `agents.enabled` and the confirm mode | `MAIL_TOOLS_DISABLED` |
+| `data-dir` | mode of the data directory (expected 700) | `MAIL_DATA_PERMISSIONS` |
+| `secrets-files` | modes of `secrets.json`, `capability.secret`, `tokens.enc`, `settings.json` (expected 600) | `MAIL_DATA_PERMISSIONS` |
+| `cache` | the cache database opens (read-only look, nothing is created) | `MAIL_CACHE_UNAVAILABLE` |
+| `unsubscribe` | `publicBaseUrl` set (boolean), mailto set, the loopback listener | `MAIL_UNSUBSCRIBE_NOT_PUBLIC` |
+| `idle` | accounts with push, how many hold IDLE or fell back to polling | `MAIL_IDLE_UNAVAILABLE` |
+| `queue` | queue entries by status and the number of drafts | `MAIL_SEND_FAILED` (info, when entries failed) |
 
 Placeholders: `<dsh-url>` is where your DSH web UI answers (for example `http://127.0.0.1:3080`), `DSH_HOME` defaults to `~/.dsh`, the profile is `web`. The plugin data directory is `${DSH_HOME:-$HOME/.dsh}/mail` unless the environment variable `DSH_MAIL_DATA_DIR` points elsewhere.
 
@@ -128,7 +145,7 @@ curl -s <dsh-url>/dsh-mail/api/doctor | node -e 'let s="";process.stdin.on("data
 D="${DSH_HOME:-$HOME/.dsh}"; ls -la "$D/settings.yaml" "$D/settings.yaml.imported" 2>/dev/null
 grep -n -A6 -- '- id: dsh-mail' "$D/profiles/web/cordis.patch.yml" 2>/dev/null | grep -v -i -E 'secret|password|token|key'
 ```
-Healthy: `settingsMode` is `register` on 0.1.5 or `forms` on 0.2.x, the `settings` check is ok and `config` is ok. `config` as the mode on a normal install, or a failing `config` check, is cause 1 or 4 (code `MAIL_SETTINGS_UNAVAILABLE`).
+Healthy: `host.settingsMode` is `register` on 0.1.5 or `forms` on 0.2.x, the `settings` check is ok and `config` is ok. `config` as the mode on a normal install, or a failing `config` check, is cause 1 or 4 (code `MAIL_SETTINGS_UNAVAILABLE`).
 
 **Fix**
 - Cause 1 and 4: use plugin version 0.2.0 or newer; restart `dsh web` because the server half loads only at start **[HUMAN if your chat runs inside dsh web]**.
@@ -459,7 +476,7 @@ D="${DSH_HOME:-$HOME/.dsh}"; ls -la "$D/settings.yaml" "$D/settings.yaml.importe
 grep -n -A12 -- '- id: dsh-mail' "$D/profiles/web/cordis.patch.yml"   # 0.2.x row (may contain secrets: do not paste it anywhere)
 ```
 
-**Fix:** use a plugin version that supports your DSH line (the doctor's `settingsMode`
+**Fix:** use a plugin version that supports your DSH line (the doctor's `host.settingsMode`
 must not be `config` on a normal install). On 0.2.x stop any script that rewrites
 `settings.yaml`, and edit non-live fields in the row. Back up the file before any hand
 edit (`cp file file.bak-$(date +%Y%m%d)`).

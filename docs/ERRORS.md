@@ -20,7 +20,7 @@ Troubleshooting entries are in [TROUBLESHOOTING.md](TROUBLESHOOTING.md).
 | MAIL_ROUTE_NOT_FOUND | 404 | route (any unknown GET path under the plugin prefix) | The path is not one of the plugin routes. | Compare the path with the route list in README; a 404 on every plugin route is a load problem instead (see C2) ([details](#mail_route_not_found)) |
 | MAIL_METHOD_NOT_ALLOWED | 405 | route (non-GET on a read path, non-POST on a change path) | The HTTP method is not allowed for this route. | Use GET for reads and POST with a JSON body for changes ([details](#mail_method_not_allowed)) |
 | MAIL_SIZE_LIMIT | 413 | tools mail_fetch, mail_attachments, mail_send; routes /send, any POST body | An attachment total (20 MB), a message or attachment read (25 MB), a request body (256 KB) or a queue entry is too large. | Shorten or split the content, send big files by link, or save the attachment with mail_attachments instead of fetching it inline ([details](#mail_size_limit)) |
-| MAIL_NOT_READY | 503 | route /session and every change route, log | The plugin has not finished creating its capability secret. | Retry in a few seconds ([details](#mail_not_ready)) |
+| MAIL_NOT_READY | 503 | route /session and every change route, log, doctor check plugin | The plugin has not finished creating its capability secret. | Retry in a few seconds ([details](#mail_not_ready)) |
 | MAIL_CONFIRM_REQUIRED | 400 | route POST /accounts/convert | The one-time conversion of legacy settings only runs with "confirm": true. | Do not set it yourself: ask the human, then repeat with confirm true ([details](#mail_confirm_required)) |
 | MAIL_SETTINGS_UNAVAILABLE | 503 | routes POST /settings, /accounts/save, /accounts/remove, /accounts/convert; doctor checks settings, config | Settings cannot be written: no settings service, no loader row for this plugin, or (DSH 0.2.x) the loader does not see the plugin Config. | Run the doctor and read checks settings and config, then follow the TROUBLESHOOTING entry ([details](#mail_settings_unavailable)) |
 | MAIL_REQUEST_FORBIDDEN | 403 | every route (read and change gates) | The route security gate refused the request: non-loopback peer, untrusted Host, cross-site fetch, wrong method or content type, or an Origin that does not match. | Call from the DSH host (loopback) through the web UI, or add the public host name to the plugin setting trustedHosts; change calls must come from the browser tab ([details](#mail_request_forbidden)) |
@@ -28,24 +28,24 @@ Troubleshooting entries are in [TROUBLESHOOTING.md](TROUBLESHOOTING.md).
 | MAIL_SESSION_COOKIE_MISSING | 403 | every change route (POST) | The DSH browser-session cookie is not on the request. | Make the change from the logged-in browser tab ([details](#mail_session_cookie_missing)) |
 | MAIL_NO_ACCOUNTS | 400 | tools (all with an account), doctor check accounts | No mail account is configured, or none is usable for the requested action. | Call mail_accounts ([details](#mail_no_accounts)) |
 | MAIL_ACCOUNT_NOT_FOUND | 404 | tools (account argument), route /send, /accounts/test | The account or provider id does not exist. | Call mail_accounts and use an id from it ([details](#mail_account_not_found)) |
-| MAIL_ACCOUNT_DISABLED | 409 | tools (account argument), send paths | The account exists but is switched off. | Choose another account, or ask the human to enable it ([details](#mail_account_disabled)) |
+| MAIL_ACCOUNT_DISABLED | 409 | tools (account argument), send paths, doctor check account:<id> (info) | The account exists but is switched off. | Choose another account, or ask the human to enable it ([details](#mail_account_disabled)) |
 | MAIL_AGENT_DENIED | 403 | tools (all), mail_folders create and rename | The account is not permitted for agents or for this action (read, send, mass send, manage folders). | Do not try other accounts to get around it ([details](#mail_agent_denied)) |
 | MAIL_TOOLS_DISABLED | 403 | tools (all), doctor check agents | agents.enabled is false: the mail tools refuse to work. | Ask the human to set agents.enabled to true; it applies without a restart for tools already registered ([details](#mail_tools_disabled)) |
 | MAIL_CAPABILITY_UNSUPPORTED | 400 | tools mail_read, mail_fetch, mail_inbox, mail_contacts, mail_remind, mail_folders | The account type cannot do this (for example folders on a send-only API account, contacts on a non-webmail account). | mail_accounts shows the capabilities per account (read, send, folders, search); pick an account that has it ([details](#mail_capability_unsupported)) |
 | MAIL_ACCOUNT_INVALID | 400 | routes POST /accounts/save, /accounts/test | The account form failed validation. | Read `message`: it lists every failing field ([details](#mail_account_invalid)) |
 | MAIL_SECRET_MISSING | 400 | doctor check account:<id> | The account has no password, app password or API key stored or resolvable. | Do not look for the value ([details](#mail_secret_missing)) |
-| MAIL_ACCOUNT_AUTH_FAILED | 401 | tools mail_read, mail_send, mail_inbox and others, routes /accounts/test, /sync, /folders, log | The IMAP, POP3, SMTP or API server refused the credentials. | Run Test connection (route /accounts/test) and read which step failed (IMAP login, SMTP verify) ([details](#mail_account_auth_failed)) |
-| MAIL_CONNECT_FAILED | 502 | tools and routes that reach a mail server, log | The server could not be reached or the TLS handshake failed. | Run Test connection and compare host, port and security with the provider preset; from the DSH host run the openssl or nc check in the TROUBLESHOOTING entry ([details](#mail_connect_failed)) |
+| MAIL_ACCOUNT_AUTH_FAILED | 401 | tools mail_read, mail_send, mail_inbox and others, routes /accounts/test, /sync, /folders, log, doctor check account:<id> (last sync) | The IMAP, POP3, SMTP or API server refused the credentials. | Run Test connection (route /accounts/test) and read which step failed (IMAP login, SMTP verify) ([details](#mail_account_auth_failed)) |
+| MAIL_CONNECT_FAILED | 502 | tools and routes that reach a mail server, log, doctor check account:<id> (last sync) | The server could not be reached or the TLS handshake failed. | Run Test connection and compare host, port and security with the provider preset; from the DSH host run the openssl or nc check in the TROUBLESHOOTING entry ([details](#mail_connect_failed)) |
 | MAIL_MAILBOX_UNREACHABLE | 502 | tools mail_inbox, mail_thread, mail_read, mail_fetch, mail_search, mail_mark, mail_move, mail_folders, routes /folders, /messages, /thread, /message, /sync, log (background sync), doctor check account:<id> | Reading or syncing a mailbox failed for a reason that is not a login or connection error. | Read `message`, then Test connection for the account; the doctor row shows the last sync status ([details](#mail_mailbox_unreachable)) |
 | MAIL_IDLE_UNAVAILABLE | n/a | log, doctor check idle | Instant new mail (IMAP IDLE) is not active for an account. | Nothing breaks: new mail arrives at the poll interval (cache.pollSeconds, default 300 s) ([details](#mail_idle_unavailable)) |
 | MAIL_OAUTH_REAUTH | 401 | tools and routes that use an OAuth account, doctor check account:<id>, UI banner "Reconnect" | The account has no valid OAuth connection: never connected, refresh token revoked or expired, or the OAuth client was changed. | Check the doctor row (needsReauth) ([details](#mail_oauth_reauth)) |
 | MAIL_OAUTH_FLOW_FAILED | 400 | routes POST /oauth/start, /oauth/complete, /oauth/device/start | The sign-in flow did not complete. | Press Connect again in the same browser ([details](#mail_oauth_flow_failed)) |
 | MAIL_OAUTH_NOT_CONFIGURED | 400 | routes POST /oauth/start, /oauth/device/start, /oauth/complete | OAuth cannot start: the account is unsaved, does not use OAuth, has no client id, or the provider rejected the client. | Read GET /oauth/redirect-uri for the exact URI, register it at the provider, paste the client id, Save, then Connect ([details](#mail_oauth_not_configured)) |
-| MAIL_SEND_FAILED | 502 | tools mail_send, mail_mass_send, mail_send_later, mail_reply, mail_forward, routes /send, /queue/send, /drafts/send, log | The message could not be delivered by the server or provider. | Read `message`, check the audit log (GET /audit) and the account limits, run Test connection ([details](#mail_send_failed)) |
+| MAIL_SEND_FAILED | 502 | tools mail_send, mail_mass_send, mail_send_later, mail_reply, mail_forward, routes /send, /queue/send, /drafts/send, log, doctor check queue (info, failed entries) | The message could not be delivered by the server or provider. | Read `message`, check the audit log (GET /audit) and the account limits, run Test connection ([details](#mail_send_failed)) |
 | MAIL_RATE_LIMITED | 429 | tools mail_send, mail_forward, mail_mass_send, routes /send, log | The per-account limit (limits.perMinute or limits.perDay) was reached. | Wait `retryAfterSec` seconds (it is in the result) and retry once ([details](#mail_rate_limited)) |
 | MAIL_TOO_MANY_RECIPIENTS | 400 | tools mail_send, mail_mass_send, route /send | The recipient count is over the per-account limit (limits.maxRecipients) or the plugin setting maxRecipients. | Split the batch, or ask the human to raise the limit ([details](#mail_too_many_recipients)) |
 | MAIL_UNSUBSCRIBE_REQUIRED | 400 | tools mail_mass_send, queue send of a mass entry | A mass send above mass.unsubscribeAbove (default 50) recipients has no unsubscribe address, or the account cannot set headers. | Pass unsubscribe: "mailto:..." and/or "https://...", or ask the human to configure unsubscribe.mailto or unsubscribe.publicBaseUrl; or pick an SMTP, Lettermint, Resend or SendGrid account ([details](#mail_unsubscribe_required)) |
-| MAIL_UNSUBSCRIBE_NOT_PUBLIC | n/a | doctor check unsubscribe | One-click unsubscribe links are not published: unsubscribe.publicBaseUrl is empty. | Information only ([details](#mail_unsubscribe_not_public)) |
+| MAIL_UNSUBSCRIBE_NOT_PUBLIC | n/a | doctor check unsubscribe | One-click unsubscribe links are not published: unsubscribe.publicBaseUrl is empty, or the optional listener is misconfigured (non-loopback listenHost, or listenPort set but nothing listens). | Information only ([details](#mail_unsubscribe_not_public)) |
 | MAIL_STORE_FULL | 409 | tools mail_send_later, mail_draft, mail_mass_send (staging), routes /queue, /drafts/save | The queue or the draft store holds its maximum. | List the queue and drafts, cancel or delete stale entries (ask the human first for entries it did not create), retry ([details](#mail_store_full)) |
 | MAIL_QUEUE_CONFLICT | 409 | tools mail_cancel, routes /queue/send, /queue/approve, /queue/cancel, /queue/delete | The queue entry is in a state that does not allow the action. | List the queue and read the status; act only on queued, scheduled or failed entries ([details](#mail_queue_conflict)) |
 | MAIL_OUTBOX_GONE | 404 | route POST /outbox/cancel | Undo send came too late or the held message is unknown. | Check the Sent folder and the Drafts: if the message is in neither, it was dropped by a restart and must be composed again ([details](#mail_outbox_gone)) |
@@ -103,7 +103,7 @@ Troubleshooting entries are in [TROUBLESHOOTING.md](TROUBLESHOOTING.md).
 
 ### MAIL_NOT_READY
 - **Meaning:** The plugin has not finished creating its capability secret.
-- **Where:** route /session and every change route, log.
+- **Where:** route /session and every change route, log, doctor check plugin.
 - **Likely causes:** The call came in the first seconds after start, or the data directory is not writable so the secret file cannot be created.
 - **Agent action:** Retry in a few seconds. If it persists run the doctor (check data-dir) and read the log line.
 - **Needs the human:** Only if the data directory permissions must be fixed
@@ -167,7 +167,7 @@ Troubleshooting entries are in [TROUBLESHOOTING.md](TROUBLESHOOTING.md).
 
 ### MAIL_ACCOUNT_DISABLED
 - **Meaning:** The account exists but is switched off.
-- **Where:** tools (account argument), send paths.
+- **Where:** tools (account argument), send paths, doctor check account:<id> (info).
 - **Likely causes:** Enabled is off in the account editor.
 - **Agent action:** Choose another account, or ask the human to enable it.
 - **Needs the human:** Yes to enable
@@ -215,7 +215,7 @@ Troubleshooting entries are in [TROUBLESHOOTING.md](TROUBLESHOOTING.md).
 
 ### MAIL_ACCOUNT_AUTH_FAILED
 - **Meaning:** The IMAP, POP3, SMTP or API server refused the credentials.
-- **Where:** tools mail_read, mail_send, mail_inbox and others, routes /accounts/test, /sync, /folders, log.
+- **Where:** tools mail_read, mail_send, mail_inbox and others, routes /accounts/test, /sync, /folders, log, doctor check account:<id> (last sync).
 - **Likely causes:** A normal password where an app password is required (2-step verification), a revoked app password, a wrong user name (full address vs local part), IMAP access not enabled at the provider, a wrong host so another server answered.
 - **Agent action:** Run Test connection (route /accounts/test) and read which step failed (IMAP login, SMTP verify). Do not retry in a loop: repeated failures can lock the mailbox.
 - **Needs the human:** Yes: new app password, provider switch
@@ -223,7 +223,7 @@ Troubleshooting entries are in [TROUBLESHOOTING.md](TROUBLESHOOTING.md).
 
 ### MAIL_CONNECT_FAILED
 - **Meaning:** The server could not be reached or the TLS handshake failed.
-- **Where:** tools and routes that reach a mail server, log.
+- **Where:** tools and routes that reach a mail server, log, doctor check account:<id> (last sync).
 - **Likely causes:** Wrong host, port or TLS mode (implicit TLS on 993/465 vs STARTTLS on 143/587), firewall or DNS on the DSH host, a self-signed certificate (Proton Mail Bridge, a self-hosted server), a provider that is down.
 - **Agent action:** Run Test connection and compare host, port and security with the provider preset; from the DSH host run the openssl or nc check in the TROUBLESHOOTING entry.
 - **Needs the human:** Yes for allowSelfSigned or firewall changes
@@ -271,7 +271,7 @@ Troubleshooting entries are in [TROUBLESHOOTING.md](TROUBLESHOOTING.md).
 
 ### MAIL_SEND_FAILED
 - **Meaning:** The message could not be delivered by the server or provider.
-- **Where:** tools mail_send, mail_mass_send, mail_send_later, mail_reply, mail_forward, routes /send, /queue/send, /drafts/send, log.
+- **Where:** tools mail_send, mail_mass_send, mail_send_later, mail_reply, mail_forward, routes /send, /queue/send, /drafts/send, log, doctor check queue (info, failed entries).
 - **Likely causes:** A rejected recipient or sender, a provider quota, an unverified sender domain, a message the server refuses, a mass send stopped by the circuit breaker (5 consecutive failures).
 - **Agent action:** Read `message`, check the audit log (GET /audit) and the account limits, run Test connection. Do not resend in a loop.
 - **Needs the human:** Yes for provider-side fixes (verified sender, quota)

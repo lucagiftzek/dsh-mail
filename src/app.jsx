@@ -214,6 +214,11 @@ export function MailView({ visible }) {
     return () => { try { es && es.close() } catch {} }
   }, [visible, fetchList])
   useEffect(() => { const t = setTimeout(() => { if (state) void fetchList() }, 350); return () => clearTimeout(t) }, [q, scope])
+  useEffect(() => {
+    const on = ev => { if (ev && ev.data && ev.data.type === 'dsh-mail-oauth') { void load(); void fetchList() } }
+    window.addEventListener('message', on)
+    return () => window.removeEventListener('message', on)
+  }, [load, fetchList])
 
   const choose = v => { const next = { account: v.account, folder: v.folder || '', title: v.title || '' }; setSel(next); saveSel(next); setPane('list'); setSwitcher(false); setOpen(null); setSelected(new Set()); setSelecting(false) }
 
@@ -278,7 +283,13 @@ export function MailView({ visible }) {
   const title = unified ? 'All inboxes' : (sel.title || (sel.folder && sel.folder !== 'INBOX' && sel.folder !== 'inbox' ? sel.folder : 'Inbox'))
   const unreadHere = rows.reduce((n, r) => n + (r.unread ? 1 : 0), 0)
   const pendingCount = state ? state.queueCounts.pending : 0
-  const statusIssues = accounts.filter(a => a.status && !a.status.ok)
+  const reauth = accounts.filter(a => a.oauth && a.oauth.needsReauth)
+  const statusIssues = accounts.filter(a => a.status && !a.status.ok && !(a.oauth && a.oauth.needsReauth))
+  async function reconnect(a) {
+    const w = window.open('about:blank', 'dsh-mail-oauth', 'width=520,height=700')
+    try { const r = await apiPost('/oauth/start', { account: a.id }); if (w) w.location.href = r.url; else toast('Allow pop-ups for this site, then press Reconnect again.') }
+    catch (e) { if (w) w.close(); toast('Reconnect failed: ' + e.message) }
+  }
   const activeKey = open ? open.account + '|' + open.thread : (rows[cursor] ? rows[cursor].account + '|' + rows[cursor].thread : '')
   const selRows = rows.filter(r => selected.has(r.account + '|' + r.thread))
 
@@ -305,7 +316,7 @@ export function MailView({ visible }) {
         {accounts.filter(a => a.receive !== 'none').map(a => (
           <button key={a.id} type="button" className="it" aria-current={sel.account === a.id} onClick={() => choose({ account: a.id, folder: '' })}>
             <span className="mlx-av" style={{ width: 28, height: 28, fontSize: 10, background: a.color }}>{initials(a.label, a.address)}</span>
-            <span className="meta"><div><b>{a.label}</b>{a.status && !a.status.ok ? <span className="mlx-dot" style={{ background: 'var(--warn)', marginLeft: 6 }} title={a.status.error} /> : null}</div><div className="mlx-s">{a.address || a.type}</div></span>
+            <span className="meta"><div><b>{a.label}</b>{(a.status && !a.status.ok) || (a.oauth && a.oauth.needsReauth) ? <span className="mlx-dot" style={{ background: 'var(--warn)', marginLeft: 6 }} title={(a.oauth && a.oauth.needsReauth) ? 'needs to reconnect' : a.status.error} /> : null}</div><div className="mlx-s">{a.address || a.type}</div></span>
             {a.unread ? <span className="mlx-pill b">{a.unread}</span> : null}
           </button>
         ))}
@@ -313,6 +324,12 @@ export function MailView({ visible }) {
       </div> : null}
 
       {error ? <div className="mlx-strip bad">Mail route unreachable: {error}</div> : null}
+      {reauth.map(a => (
+        <div key={a.id} className="mlx-strip warn" role="alert">
+          <span style={{ flex: 1 }}>{a.label} needs to reconnect{a.oauth.reason ? ': ' + a.oauth.reason.slice(0, 140) : ''}</span>
+          <button type="button" onClick={() => void reconnect(a)}>Reconnect</button>
+        </div>
+      ))}
       {statusIssues.length && pane === 'list' ? <div className="mlx-strip warn">{statusIssues.map(a => a.label).join(', ')}: {statusIssues[0].status.error} <button type="button" onClick={() => setPane('settings')}>Test</button></div> : null}
 
       {pane === 'list' ? <>

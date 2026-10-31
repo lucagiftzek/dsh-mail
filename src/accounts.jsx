@@ -10,7 +10,8 @@ import { apiGet, apiPost } from './api.js'
 const TEMPLATES = {
   'imap-smtp': { receive: { protocol: 'imap', host: '', port: 993, security: 'tls' }, send: { protocol: 'smtp', host: '', port: 465, security: 'tls' }, auth: { method: 'password' } },
   'pop3-smtp': { receive: { protocol: 'pop3', host: '', port: 995, security: 'tls', leaveOnServer: true }, send: { protocol: 'smtp', host: '', port: 465, security: 'tls' }, auth: { method: 'password' } },
-  google: { receive: { protocol: 'imap', host: 'imap.gmail.com', port: 993, security: 'tls' }, send: { protocol: 'smtp', host: 'smtp.gmail.com', port: 465, security: 'tls' }, auth: { method: 'app-password' } },
+  google: { receive: { protocol: 'imap', host: 'imap.gmail.com', port: 993, security: 'tls' }, send: { protocol: 'smtp', host: 'smtp.gmail.com', port: 465, security: 'tls' }, auth: { method: 'app-password' }, oauth: { clientId: '' } },
+  microsoft: { receive: { protocol: 'imap', host: 'outlook.office365.com', port: 993, security: 'tls' }, send: { protocol: 'smtp', host: 'smtp.office365.com', port: 587, security: 'starttls' }, auth: { method: 'oauth2' }, oauth: { clientId: '', tenant: 'common', sendMode: 'auto' } },
   local: { receive: { protocol: 'imap', host: '', port: 993, security: 'tls' }, send: { protocol: 'smtp', host: '', port: 587, security: 'starttls' }, auth: { method: 'password' } },
   tzekos: { receive: { protocol: 'api' }, send: { protocol: 'api' }, auth: { method: 'bearer' }, api: { baseUrl: '' } },
   lettermint: { receive: { protocol: 'none' }, send: { protocol: 'api' }, auth: { method: 'api-key' }, api: { baseUrl: '' } },
@@ -18,7 +19,8 @@ const TEMPLATES = {
   agentmail: { receive: { protocol: 'api' }, send: { protocol: 'api' }, auth: { method: 'api-key' }, api: { inbox: '', baseUrl: '' } },
 }
 const NOTES = {
-  google: 'Turn on 2-Step Verification, create an app password (Google Account, Security, App passwords) and paste it below. OAuth sign-in arrives in the next release.',
+  google: 'Simplest: an app password (needs 2-Step Verification; Google Account, Security, App passwords). For Workspace accounts without app passwords, use OAuth2 with your own Google Cloud OAuth client.',
+  microsoft: 'Microsoft only accepts OAuth2 for IMAP and SMTP. You register your own app in Microsoft Entra (free) and connect once.',
   'pop3-smtp': 'POP3 has no server folders or flags: read state is kept locally. Messages are left on the server.',
   tzekos: 'Tzekos Mail webmail agent API: the base URL of the webmail and a service token (MAIL_AGENT_TOKEN), never a user password.',
   lettermint: 'Send only. API key from the Lettermint dashboard.',
@@ -30,7 +32,7 @@ function blank(type) {
   return {
     id: '', label: '', type, enabled: true, address: '', displayName: '', defaultFrom: '', replyTo: '', signature: '',
     allowSelfSigned: false, passwordFile: '', passwordEnv: '',
-    secrets: { password: '', apiKey: '' },
+    secrets: { password: '', apiKey: '', oauthClientSecret: '' },
     agent: { allow: false, canRead: true, canSend: true, canMass: false, default: false },
     limits: { maxRecipients: 500 },
     ...structuredClone(TEMPLATES[type] || TEMPLATES['imap-smtp']),
@@ -68,6 +70,97 @@ function Endpoint({ side, e, set, protocols }) {
   )
 }
 
+const HELP = {
+  google: [
+    'Google Cloud console (console.cloud.google.com): create or pick a project.',
+    'APIs and Services, OAuth consent screen: user type External (or Internal for a Workspace organisation), add your address as a test user while testing.',
+    'Set the publishing status to "In production". In "Testing" Google expires refresh tokens after 7 days and you would have to reconnect every week. An unverified app shows a warning screen on consent; that is fine for your own use.',
+    'Credentials, Create credentials, OAuth client ID, type "Web application". Authorized redirect URI: the address shown below (Google requires https, or http://localhost for a local DSH).',
+    'Scope used: https://mail.google.com/ (IMAP and SMTP). Copy the client ID and client secret here, Save, then Connect.',
+  ],
+  microsoft: [
+    'Microsoft Entra admin center (entra.microsoft.com), App registrations, New registration. Supported account types: "any organizational directory and personal Microsoft accounts" (tenant common), or only your organisation (put its tenant id or domain below).',
+    'Authentication, Add a platform, Web, redirect URI: the address shown below. For the device code sign-in (DSH without public https), also turn on "Allow public client flows".',
+    'API permissions, Add a permission, Microsoft Graph, Delegated: offline_access, IMAP.AccessAsUser.All, SMTP.Send and Mail.Send (Mail.Send is for the Graph fallback). Work or school tenants may need an administrator to grant consent.',
+    'Certificates and secrets, New client secret: paste its Value below (leave empty for a public client that only uses the device code).',
+    'If your organisation disabled SMTP AUTH for the mailbox (error 5.7.139), keep "Send via: automatic" or choose "Microsoft Graph": mail then goes through Graph sendMail and lands in Sent Items.',
+  ],
+}
+
+/** OAuth2 setup + connection panel for Google and Microsoft accounts. */
+function OAuthPanel({ a, set, isNew, initial, saveFirst }) {
+  const [uri, setUri] = useState('')
+  const [st, setSt] = useState(initial.oauthStatus || null)
+  const [busy, setBusy] = useState('')
+  const [err, setErr] = useState('')
+  const [dev, setDev] = useState(null)
+  const refresh = async () => { if (!a.id || isNew) return; try { const r = await apiGet('/oauth/status', { account: a.id }); setSt(r.status); if (r.status.device) setDev(r.status.device) } catch {} }
+  useEffect(() => { apiGet('/oauth/redirect-uri').then(r => setUri(r.redirectUri)).catch(() => {}) }, [])
+  useEffect(() => {
+    const on = ev => { if (ev && ev.data && ev.data.type === 'dsh-mail-oauth') void refresh() }
+    window.addEventListener('message', on)
+    return () => window.removeEventListener('message', on)
+  }, [a.id])
+  useEffect(() => { if (!dev || dev.status !== 'pending') return undefined; const t = setInterval(() => void refresh(), 3000); return () => clearInterval(t) }, [dev && dev.status])
+  async function connect() {
+    setErr(''); setBusy('connect')
+    const w = window.open('about:blank', 'dsh-mail-oauth', 'width=520,height=700')
+    try {
+      await saveFirst()
+      const r = await apiPost('/oauth/start', { account: a.id })
+      if (w) w.location.href = r.url
+      else setErr('The pop-up was blocked. Allow pop-ups for this site and press Connect again.')
+    } catch (e) { if (w) w.close(); setErr(e.message) } finally { setBusy('') }
+  }
+  async function device() {
+    setErr(''); setBusy('device')
+    try { await saveFirst(); const r = await apiPost('/oauth/device/start', { account: a.id }); setDev({ status: 'pending', userCode: r.userCode, verificationUri: r.verificationUri, expiresAt: r.expiresAt }) }
+    catch (e) { setErr(e.message) } finally { setBusy('') }
+  }
+  async function disconnect() {
+    if (!window.confirm('Disconnect ' + a.id + '? The stored tokens are deleted' + (a.type === 'google' ? ' and revoked at Google.' : '.'))) return
+    setBusy('revoke')
+    try { const r = await apiPost('/oauth/revoke', { account: a.id }); setSt({ connected: false, needsReauth: false }); setDev(null); if (r.note) setErr(r.note) } catch (e) { setErr(e.message) } finally { setBusy('') }
+  }
+  const help = HELP[a.type] || []
+  return (
+    <div className="mlx-acc" style={{ background: 'var(--l2)' }}>
+      <b>OAuth2 sign-in</b>
+      <details style={{ margin: '6px 0' }}>
+        <summary className="mlx-s" style={{ cursor: 'pointer' }}>How to create your own {a.type === 'google' ? 'Google' : 'Microsoft'} OAuth app (step by step)</summary>
+        <ol className="mlx-s" style={{ paddingLeft: 18, lineHeight: 1.55 }}>{help.map((h, i) => <li key={i}>{h}</li>)}</ol>
+      </details>
+      <Field label="Redirect URI to register" hint="Copy it exactly. Set a fixed public base in Settings (oauth.redirectBaseUrl) if this shows the wrong host.">
+        <div className="mlx-flex"><input className="mlx-in mlx-mono" readOnly value={uri} style={{ flex: 1 }} onFocus={e => e.target.select()} /><button type="button" className="mlx-btn" onClick={() => { try { void navigator.clipboard.writeText(uri) } catch {} }}>Copy</button></div>
+      </Field>
+      <div className="mlx-grid">
+        <Field label="Client ID"><input className="mlx-in mlx-mono" value={(a.oauth && a.oauth.clientId) || ''} onChange={e => set('oauth.clientId', e.target.value.trim())} /></Field>
+        <Field label="Client secret"><SecretInput value={a.secrets.oauthClientSecret} onChange={v => set('secrets.oauthClientSecret', v)} /></Field>
+      </div>
+      {a.type === 'microsoft' ? <div className="mlx-grid">
+        <Field label="Tenant" hint="common, organizations, consumers, your domain or tenant id"><input className="mlx-in mlx-mono" value={(a.oauth && a.oauth.tenant) || ''} onChange={e => set('oauth.tenant', e.target.value.trim())} placeholder="common" /></Field>
+        <Field label="Send via">
+          <select className="mlx-in" value={(a.oauth && a.oauth.sendMode) || 'auto'} onChange={e => set('oauth.sendMode', e.target.value)}>
+            <option value="auto">Automatic (SMTP, Graph when SMTP AUTH is off)</option><option value="smtp">SMTP only</option><option value="graph">Microsoft Graph only</option>
+          </select>
+        </Field>
+      </div> : null}
+      <div className="mlx-flex" style={{ margin: '4px 0' }}>
+        <span className="mlx-dot" style={{ background: st && st.connected ? 'var(--ok)' : st && st.needsReauth ? 'var(--warn)' : 'var(--ink3)' }} />
+        <span className="mlx-s" style={{ flex: 1 }}>{st && st.connected ? 'Connected' + (st.user ? ' as ' + st.user : '') : st && st.needsReauth ? 'Needs to reconnect: ' + (st.reason || '') : 'Not connected'}</span>
+      </div>
+      <div className="mlx-flex">
+        <button type="button" className="mlx-btn p" disabled={!!busy || !a.id || !(a.oauth && a.oauth.clientId)} onClick={() => void connect()}>{busy === 'connect' ? 'Opening...' : st && (st.connected || st.needsReauth) ? 'Reconnect' : 'Connect'}</button>
+        {a.type === 'microsoft' ? <button type="button" className="mlx-btn" disabled={!!busy || !a.id || !(a.oauth && a.oauth.clientId)} onClick={() => void device()}>Use a device code</button> : null}
+        {st && (st.connected || st.needsReauth) ? <button type="button" className="mlx-btn d" disabled={!!busy} onClick={() => void disconnect()}>Disconnect</button> : null}
+      </div>
+      {dev && dev.status === 'pending' ? <div className="mlx-note warn" style={{ margin: '8px 0 0' }}>Open <a href={dev.verificationUri} target="_blank" rel="noreferrer noopener">{dev.verificationUri}</a> on any device and enter the code <b className="mlx-mono">{dev.userCode}</b>. This page updates when you are done.</div> : null}
+      {dev && dev.status === 'failed' ? <div className="mlx-note bad" style={{ margin: '8px 0 0' }}>{dev.error}</div> : null}
+      {err ? <div className="mlx-note bad" style={{ margin: '8px 0 0' }}>{err}</div> : null}
+    </div>
+  )
+}
+
 function AccountForm({ initial, isNew, types, onDone, onCancel }) {
   const [a, setA] = useState(initial)
   const [busy, setBusy] = useState('')
@@ -81,15 +174,22 @@ function AccountForm({ initial, isNew, types, onDone, onCancel }) {
     setA(next); setMsg(null)
   }
   const t = a.type
-  const mailProto = ['imap-smtp', 'pop3-smtp', 'google', 'local'].includes(t)
+  const mailProto = ['imap-smtp', 'pop3-smtp', 'google', 'microsoft', 'local'].includes(t)
+  const oauth = (t === 'google' && a.auth.method === 'oauth2') || t === 'microsoft'
+  const [saved, setSaved] = useState(!isNew)
+  /** Save silently (used by Connect, which needs the stored account). */
+  async function saveFirst() {
+    await apiPost('/accounts/save', { account: a, originalId: saved ? a.id : undefined })
+    setSaved(true)
+  }
   async function test() {
     setBusy('test'); setMsg(null)
-    try { const r = await apiPost('/accounts/test', { account: a, originalId: isNew ? undefined : initial.id }); setMsg({ tone: r.result.ok ? 'ok' : 'bad', steps: r.result.steps, text: r.result.ok ? 'Connection works. Capabilities: ' + r.result.capabilities.join(', ') : 'Test failed' }) }
+    try { const r = await apiPost('/accounts/test', { account: a, originalId: saved ? a.id : undefined }); setMsg({ tone: r.result.ok ? 'ok' : 'bad', steps: r.result.steps, text: r.result.ok ? 'Connection works. Capabilities: ' + r.result.capabilities.join(', ') : 'Test failed' }) }
     catch (e) { setMsg({ tone: 'bad', text: e.message }) } finally { setBusy('') }
   }
   async function save() {
     setBusy('save'); setMsg(null)
-    try { await apiPost('/accounts/save', { account: a, originalId: isNew ? undefined : initial.id }); onDone('Saved ' + a.id + '.') }
+    try { await apiPost('/accounts/save', { account: a, originalId: saved ? a.id : undefined }); onDone('Saved ' + a.id + '.') }
     catch (e) { setMsg({ tone: 'bad', text: e.message }) } finally { setBusy('') }
   }
   async function remove() {
@@ -114,10 +214,15 @@ function AccountForm({ initial, isNew, types, onDone, onCancel }) {
       {mailProto ? <>
         <Endpoint side="receive" e={a.receive} set={set} protocols={t === 'local' ? ['imap', 'pop3'] : null} />
         <Endpoint side="send" e={a.send} set={set} />
-        <div className="mlx-grid">
+        {t === 'google' ? <Field label="Sign-in method">
+          <select className="mlx-in" value={a.auth.method === 'oauth2' ? 'oauth2' : 'app-password'} onChange={e => set('auth.method', e.target.value)}>
+            <option value="app-password">App password (simplest)</option><option value="oauth2">OAuth2 with your own Google client (Workspace)</option>
+          </select>
+        </Field> : null}
+        {oauth ? <OAuthPanel a={a} set={set} isNew={!saved} initial={initial} saveFirst={saveFirst} /> : <div className="mlx-grid">
           <Field label="Login" hint="Empty: the email address"><input className="mlx-in mlx-mono" value={(a.auth && a.auth.user) || ''} onChange={e => set('auth.user', e.target.value.trim())} /></Field>
           <Field label={t === 'google' ? 'App password' : 'Password'}><SecretInput value={a.secrets.password} onChange={v => set('secrets.password', v)} /></Field>
-        </div>
+        </div>}
         <details style={{ marginBottom: 8 }}>
           <summary className="mlx-s" style={{ cursor: 'pointer' }}>Password from a file or an environment variable, certificates</summary>
           <div className="mlx-grid" style={{ marginTop: 6 }}>
@@ -169,7 +274,7 @@ function AccountForm({ initial, isNew, types, onDone, onCancel }) {
   )
 }
 
-const ADD_ORDER = ['imap-smtp', 'pop3-smtp', 'google', 'tzekos', 'lettermint', 'resend', 'agentmail', 'local']
+const ADD_ORDER = ['imap-smtp', 'pop3-smtp', 'google', 'microsoft', 'tzekos', 'lettermint', 'resend', 'agentmail', 'local']
 
 export function AccountsEditor({ onChanged }) {
   const [data, setData] = useState(null)
@@ -208,6 +313,7 @@ export function AccountsEditor({ onChanged }) {
               <span className="mlx-s">{a.type}{a.address ? ' · ' + a.address : ''}</span>
               <span style={{ flex: 1 }} />
               {!a.enabled ? <span className="mlx-pill">disabled</span> : null}
+              {a.oauthStatus && a.oauthStatus.needsReauth ? <span className="mlx-pill" style={{ color: 'var(--warn)' }}>reconnect</span> : a.oauthStatus ? <span className="mlx-pill">{a.oauthStatus.connected ? 'connected' : 'not connected'}</span> : null}
               {a.agent.allow ? <span className="mlx-pill">agents</span> : null}
               <button type="button" className="mlx-btn" onClick={() => setEdit({ account: structuredClone(a), isNew: false })}>Edit</button>
             </div>

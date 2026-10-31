@@ -169,6 +169,7 @@ await test('bundle exports apply() + inject through the ModuleLoader factory', (
 await import('./accounts.test.mjs')
 await import('./routes.test.mjs')
 await import('./e2e.test.mjs')
+await import('./oauth.test.mjs')
 
 rmSync(TMP, { recursive: true, force: true })
 console.log('\n' + stats.passed + ' passed, ' + stats.failed + ' failed' + (stats.failed ? ': ' + stats.failures.join('; ') : ''))

@@ -1,7 +1,8 @@
 # dsh-mail
 
 Mail for agents and humans in the DeepSeek Harness (DSH). Connect any IMAP or
-POP3 mailbox, Gmail with an app password, a Tzekos Mail webmail, or a sending
+POP3 mailbox, Gmail or Microsoft 365 / Outlook.com (OAuth2 with your own
+client, or a Gmail app password), a Tzekos Mail webmail, or a sending
 service (Lettermint, Resend, AgentMail). Read your mail in the sidebar Mail
 tab, and let agents read, search, file and send mail through the `mail_*`
 tools, with sends drafted first by default.
@@ -10,12 +11,12 @@ Everything runs on your DSH host: mail is fetched straight from your own
 servers into a local cache, nothing is sent anywhere else, and there is no
 telemetry.
 
-## What is in version 0.2 (phase 1 of v2)
+## What is in version 0.2 (phases 1 and 2 of v2)
 
 - **Accounts** in DSH Settings: a "Mail" settings section (and the gear in the
   tab) to add, edit, test and remove accounts. Several accounts at once.
-- **Account types**: generic IMAP + SMTP, POP3 + SMTP, Google (app password),
-  self-hosted (IMAP or POP3), Tzekos Mail (webmail agent API, optional),
+- **Account types**: generic IMAP + SMTP, POP3 + SMTP, Google (app password
+  or OAuth2), Microsoft 365 / Outlook.com (OAuth2), self-hosted (IMAP or POP3), Tzekos Mail (webmail agent API, optional),
   Lettermint and Resend (send only), AgentMail.
 - **Local cache** (built-in `node:sqlite`): folders, messages, threads and
   flags; initial sync of the last 90 days (newest 1000 per folder), then
@@ -32,9 +33,13 @@ telemetry.
   `mail_accounts`, `mail_folders`, `mail_search`, `mail_mark`, `mail_move`,
   `mail_draft`, `mail_attachments`.
 
-Coming next: Google and Microsoft OAuth2 (phase 2), the EU provider presets
-and SendGrid (phase 3), IMAP IDLE push, full-text search, rich compose and
-undo send (phase 4).
+- **Google and Microsoft with OAuth2** (phase 2): bring your own OAuth client,
+  authorization code + PKCE, XOAUTH2 for IMAP and SMTP, tokens encrypted at
+  rest, automatic refresh, a Reconnect banner, the Microsoft device code
+  sign-in, and Microsoft Graph sendMail when a tenant disabled SMTP AUTH.
+
+Coming next: the EU provider presets and SendGrid (phase 3), IMAP IDLE push,
+full-text search, rich compose and undo send (phase 4).
 
 ## Accounts
 
@@ -46,7 +51,8 @@ API call) and reports each step; it never shows a secret.
 |---|---|---|---|
 | IMAP + SMTP | IMAP (TLS 993 or STARTTLS 143) | SMTP (TLS 465 or STARTTLS 587) | password or app password |
 | POP3 + SMTP | POP3 (TLS 995 or STLS 110) | SMTP | password; read state is kept locally, mail stays on the server |
-| Google | imap.gmail.com | smtp.gmail.com | app password (2-Step Verification required) |
+| Google | imap.gmail.com | smtp.gmail.com | app password (2-Step Verification required), or OAuth2 with your own client |
+| Microsoft 365 / Outlook.com | outlook.office365.com | smtp.office365.com, or Microsoft Graph | OAuth2 only (your own Entra app) |
 | Self-hosted | IMAP or POP3 | SMTP | password; plaintext allowed only to a loopback host |
 | Tzekos Mail | webmail `/api/agent` | same API | service token (never a user password) |
 | Lettermint, Resend | none | API | API key |
@@ -85,6 +91,65 @@ off). `canRead`, `canSend` and `canMass` narrow it further, and
 a `draftId`; `mail_send({ draftId, confirm: true })` delivers it, or you send it
 from the Queue pane of the tab. Mass and scheduled sends wait for approval in
 the queue. `reply-only` keeps the v0.1 behaviour (only `mail_reply` drafts).
+
+### Google and Microsoft (OAuth2)
+
+There is no shared app: you create your own OAuth client once (free), paste
+its client id and secret into the account, press **Save**, then **Connect**.
+The editor shows the exact redirect URI to register:
+`https://<your DSH host>/dsh-mail/api/oauth/callback` (for a DSH used only on
+the same machine, `http://localhost:<port>/dsh-mail/api/oauth/callback`). If
+the host is shown wrong behind a proxy, set `oauth.redirectBaseUrl` to the
+public base URL.
+
+**Google (Gmail, Workspace).** The simplest way is an app password (account
+type Google, sign-in method "App password"). For OAuth2:
+
+1. Google Cloud console: create or pick a project.
+2. APIs and Services, OAuth consent screen: user type External (or Internal
+   inside a Workspace organisation); add yourself as a test user while testing.
+3. Set the publishing status to **In production**. In "Testing", Google
+   expires refresh tokens after 7 days and you would have to reconnect every
+   week. An unverified app shows a warning screen on consent, which is fine
+   for your own use.
+4. Credentials, Create credentials, OAuth client ID, type **Web application**,
+   authorized redirect URI as shown in the editor.
+5. Scope requested: `https://mail.google.com/` (IMAP and SMTP).
+
+**Microsoft 365 / Outlook.com** (OAuth2 only; basic authentication for IMAP
+and SMTP is retired):
+
+1. Microsoft Entra admin center, App registrations, New registration.
+   Supported account types: any organizational directory and personal
+   Microsoft accounts (tenant `common`), or only your organisation (enter its
+   tenant id or domain in the account).
+2. Authentication, Add a platform, **Web**, redirect URI as shown in the
+   editor. For the **device code** sign-in (a DSH without public https), also
+   enable "Allow public client flows"; the tab then shows a code to enter at
+   microsoft.com/devicelogin.
+3. API permissions, Microsoft Graph, Delegated: `offline_access`,
+   `IMAP.AccessAsUser.All`, `SMTP.Send`, `Mail.Send`. Work or school tenants
+   may need an administrator to grant consent, and IMAP must be enabled for
+   the mailbox.
+4. Certificates and secrets: create a client secret and paste its value
+   (optional for a public client that only uses the device code).
+5. **Send via**: automatic (default) uses SMTP and switches to Microsoft Graph
+   `sendMail` when the tenant disabled SMTP AUTH (error 5.7.139); "SMTP only"
+   or "Microsoft Graph only" force one path. Graph keeps the message in Sent
+   Items.
+
+**How it works.** Authorization code with PKCE (S256); the `state` is signed,
+single use, valid for 10 minutes and bound to your browser session. The
+provider redirects to a static callback page that hands the code to a gated
+POST route, so the code only reaches the server through all four security
+layers. Refresh and access tokens live only in `~/.dsh/mail/tokens.enc`,
+encrypted with AES-256-GCM (key derived from the plugin's 0600 capability
+secret), never in settings, routes or logs. Access tokens are refreshed 120 s
+before they expire, once per account even under concurrent use. A revoked or
+expired grant marks the account "needs to reconnect" and the tab shows a
+**Reconnect** banner. **Disconnect** revokes the token at Google (Microsoft
+has no revocation endpoint; remove the app under My Apps) and deletes it
+locally.
 
 ### Upgrading from v0.1
 
@@ -152,6 +217,8 @@ a body; HTML is converted to text.
   handlers, remote images blocked until you ask) and shown in a sandboxed
   frame without script permission under a strict Content Security Policy.
 - Attachments download as attachments with `nosniff`; 25 MB cap.
+- OAuth tokens are encrypted at rest (AES-256-GCM) and never leave the host;
+  the sign-in state is signed, single use and bound to your browser session.
 - TLS certificates are verified unless an account opts in to
   `allowSelfSigned`; plaintext only to a loopback host.
 - Cache, drafts, queue and settings files are created with mode 0600 in a
@@ -190,6 +257,10 @@ lib/index.js           host entry: settings, routes, timers
 lib/settings-store.js  settings access for DSH 0.1 and 0.2
 lib/accounts.js        account model, legacy shim, secrets, permissions
 lib/service.js         one interface over every account type
+lib/oauth.js           OAuth2: PKCE, signed state, token endpoints, device code
+lib/tokens.js          encrypted token store, single-flight refresh
+lib/oauth-routes.js    /oauth routes and the callback page
+lib/graph.js           Microsoft Graph sendMail (MIME)
 lib/imap.js            IMAP (imapflow) and folder sync
 lib/pop3.js            POP3 client
 lib/smtp.js            SMTP (nodemailer), header and recipient checks

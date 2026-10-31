@@ -62,3 +62,21 @@ known secret value.
 `lib/staging.js` keeps queue entries as JSON files. The timer sends only
 `scheduled` entries whose time has come; `queued` entries wait for the tab.
 Agent drafts live in `lib/drafts.js` and show up in the same pane.
+
+## OAuth2 (phase 2)
+
+`lib/oauth.js` builds the authorization URL (code + PKCE S256), signs the
+`state` (HMAC with the capability secret: account, nonce, verifier hash,
+cookie fingerprint, 10 min expiry) and keeps the verifier in an in-memory
+`FlowStore` keyed by the nonce, consumed once. `GET /oauth/callback` is the
+only route reachable after a cross-site redirect: it checks the loopback peer
+and the Host, then serves a static page (nonce CSP, no referrer) that posts
+code + state to `POST /oauth/complete`, which passes the full mutate gate and
+compares the harness cookie fingerprint with the one signed into the state.
+`lib/tokens.js` stores tokens AES-256-GCM encrypted (HKDF-SHA256 key from the
+capability secret) and refreshes per account and purpose (`mail`, Microsoft
+`graph`) single-flight, 120 s before expiry; `invalid_grant` sets
+`needsReauth`. IMAP and SMTP use XOAUTH2 through imapflow and nodemailer;
+Microsoft accounts fall back to Graph `sendMail` with the MIME message when
+SMTP AUTH is refused (send mode `auto`) or always (`graph`). The device code
+flow polls in the background and is visible through `GET /oauth/status`.

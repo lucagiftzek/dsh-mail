@@ -1,7 +1,7 @@
 {
   "name": "dsh-mail",
-  "version": "0.1.0",
-  "description": "DSH plugin for agent email tools: send, mass send (CSV-personalised), send-later (scheduled queue), read/fetch inbox, list domains. Multi-provider: Lettermint, AgentMail, Resend, OVH (SMTP/IMAP), Manual SMTP+IMAP/POP, Local self-host (expert). Settings UI + sidebar tab + agent tools.",
+  "version": "0.2.0",
+  "description": "Mail for agents and humans in the DeepSeek Harness: IMAP, POP3 and SMTP accounts, Gmail with an app password, Tzekos Mail, Lettermint, Resend and AgentMail; a local cache, a Mail sidebar tab with a reading view, an accounts editor in DSH Settings, and mail_* agent tools with draft-first sending.",
   "type": "module",
   "main": "lib/index.js",
   "exports": {
@@ -13,10 +13,11 @@
     "lib",
     "cordis.patch.yml",
     "docs",
-    "README.md"
+    "README.md",
+    "LICENSE"
   ],
   "scripts": {
-    "check": "for f in lib/index.js lib/providers.js lib/staging.js lib/security.js lib/client.js; do node --check $f || exit 1; done && node test/run.mjs",
+    "check": "for f in lib/*.js; do node --check $f || exit 1; done && node test/run.mjs",
     "build": "node scripts/build.mjs",
     "test": "node test/run.mjs"
   },
@@ -54,7 +55,11 @@
     "resend",
     "ovh",
     "smtp",
-    "imap"
+    "imap",
+    "pop3",
+    "imapflow",
+    "webmail",
+    "mail-client"
   ],
   "author": {
     "name": "Loukas \"Luca\" Tzekos",
@@ -66,6 +71,15 @@
     "url": "git+https://github.com/lucagiftzek/dsh-mail.git"
   },
   "devDependencies": {
-    "esbuild": "^0.28.2"
+    "esbuild": "^0.28.2",
+    "hoodiecrow-imap": "^3.3.1",
+    "smtp-server": "^3.21.3"
+  },
+  "dependencies": {
+    "imapflow": "^2.10.0",
+    "mailparser": "^3.14.1",
+    "nodemailer": "^10.3.1",
+    "sanitize-html": "^2.18.1",
+    "yaml": "^2.9.1"
   }
 }

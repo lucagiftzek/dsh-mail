@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * dsh-mail — browser-half build.
+ * dsh-mail: browser-half build.
  *
  * Bundles src/client.jsx → lib/client.js wrapped in a ModuleLoader factory,
  * exactly like dsh-hpc does. The wrapper is what lets the harness inject
@@ -9,12 +9,12 @@
  * format MUST be 'cjs': the factory returns module.exports. 'iife' wraps the
  * module in (()=>{...})(), module.exports stays {} and the WHOLE web UI fails
  * to boot ("invalid plugin, expect function or object with an apply method,
- * received object") — that shipped once, 2026-09-19.
+ * received object"): that shipped once, 2026-09-19.
  *
  * lib/client.js is live: dsh's HMR watcher re-hashes it on every write and
  * serves it to the next page load. So the bundle is built in memory, loaded
  * through a stub __ModuleLoader__ and checked for { apply, inject } first, and
- * only then written to a temp file and renamed over lib/client.js — a failed
+ * only then written to a temp file and renamed over lib/client.js: a failed
  * or half-written build never reaches the UI.
  *
  * Run: node scripts/build.mjs        (or: pnpm run build)
@@ -29,6 +29,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url))
 const root = resolve(__dirname, '..')
 const outfile = join(root, 'lib', 'client.js')
 const ID = 'dsh-mail'
+const BUDGET = 120 * 1024
 
 mkdirSync(join(root, 'lib'), { recursive: true })
 
@@ -52,7 +53,7 @@ export function loadClientBundle(source) {
   const window = { __ModuleLoader__: { load: (entry) => { loaded = entry } } }
   runInNewContext(source, { window, console })
   if (!loaded || typeof loaded.factory !== 'function') throw new Error('bundle never called window.__ModuleLoader__.load({ id, factory })')
-  const stubs = { react: {}, 'react/jsx-runtime': { jsx() {}, jsxs() {}, Fragment: 'Fragment' } }
+  const stubs = { react: { useState() {}, useEffect() {}, useRef() {}, useCallback() {}, useMemo() {} }, 'react/jsx-runtime': { jsx() {}, jsxs() {}, Fragment: 'Fragment' } }
   const exported = loaded.factory((name) => {
     if (!(name in stubs)) throw new Error('bundle requires ' + JSON.stringify(name) + ', which the shell does not provide')
     return stubs[name]
@@ -65,9 +66,10 @@ export function verifyClientBundle(source) {
   const { id, exported } = loadClientBundle(source)
   if (id !== ID) throw new Error('bundle registers id ' + JSON.stringify(id) + ', expected ' + JSON.stringify(ID))
   if (!exported || typeof exported.apply !== 'function') {
-    throw new Error('factory exports ' + JSON.stringify(Object.keys(exported || {})) + ' with no apply() — the loader would reject it and the web UI would not boot')
+    throw new Error('factory exports ' + JSON.stringify(Object.keys(exported || {})) + ' with no apply(): the loader would reject it and the web UI would not boot')
   }
-  if (JSON.stringify(exported.inject) !== '["betterSidebar"]') throw new Error('inject is ' + JSON.stringify(exported.inject) + ', expected ["betterSidebar"]')
+  if (JSON.stringify(exported.inject) !== '["betterSidebar","slots"]') throw new Error('inject is ' + JSON.stringify(exported.inject) + ', expected ["betterSidebar","slots"]')
+  if (source.length > BUDGET) throw new Error('bundle is ' + source.length + ' bytes, over the ' + BUDGET + ' byte budget')
 }
 
 async function main() {
@@ -96,7 +98,7 @@ async function main() {
   const tmp = outfile + '.tmp-' + process.pid
   writeFileSync(tmp, source)
   renameSync(tmp, outfile)
-  console.log('dsh-mail: bundle verified ({ apply, inject }) and written to lib/client.js')
+  console.log('dsh-mail: bundle verified ({ apply, inject }, ' + source.length + ' bytes) and written to lib/client.js')
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {

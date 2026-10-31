@@ -1,100 +1,64 @@
-# dsh-mail Architecture
+# dsh-mail design notes (v0.2, phase 1 of v2)
 
-## Overview
+## Halves
 
-dsh-mail is a DSH plugin that gives agents the ability to send and read email
-through multiple provider backends. It follows the same architecture pattern
-as dsh-hpc: a host half (Node ESM) that defines tools and API routes, and a
-browser half (React JSX) that renders a sidebar tab.
+- **Host half** (`lib/`, Node ESM): settings, the account model, mail access,
+  the cache, HTTP routes under `/dsh-mail/api`, timers and the agent tools.
+- **Browser half** (`src/*.jsx`, bundled by `scripts/build.mjs` into
+  `lib/client.js`): the Mail sidebar tab (dsh-better-sidebar) and the "Mail"
+  section of DSH Settings (`settings.section` slot). The build verifies the
+  bundle through a stub ModuleLoader (exports `apply` + `inject`, no
+  `@deepseek-ai/*` values, size budget 120 KB) before replacing the live file.
 
-## Host half (lib/)
+## Settings
 
-### index.js
+`lib/settings-store.js` is the only module that reads or writes settings.
+With `ctx.settings.register` (DSH 0.1.x) it registers the schemastery schema
+at `dsh-mail` (live). Without it (DSH 0.2.x) it layers DEFAULTS, the old
+`dsh-mail` block of `settings.yaml` or `settings.yaml.imported`, the cordis
+row config (volatile references unwrapped) and `<data dir>/settings.json`
+(0600). Writes go through the gated `POST /settings` and `/accounts/*` routes
+in both modes.
 
-The main entry point. `apply(ctx)` receives the DSH context and:
+## Accounts
 
-1. **Registers settings** via schemastery schema at namespace `dsh-mail`
-2. **Defines agent tools** via `ctx.tools.register(defineTool({...}))` — 8 tools
-3. **Registers HTTP routes** at `/dsh-mail/api/*` via `ctx.webServer.register`
-4. **Runs a tick timer** every `tickSeconds` to process scheduled queue entries
-5. **Resolves credentials** at call-time from settings + local credential files
+`lib/accounts.js` normalises `accounts[]`, validates them, derives
+capabilities, redacts secrets (`__set__`) and merges them back on save. The
+legacy shim turns v0.1 provider settings into virtual accounts (ids = old
+provider ids, `legacyProvider` + `legacyCreds` keep the v0.1 transport).
+`effectiveConfirmMode` returns the explicit `agents.confirmMode`, else
+`reply-only` for installs that only have virtual accounts, else `all`.
 
-### providers.js
+## Mail access
 
-Multi-provider transport layer. `buildProvider(id, creds)` returns a provider
-object with a common interface:
+`lib/service.js` dispatches by `receiveKind`: `imap` (imapflow with a pooled,
+serialised connection per account), `pop3` (`lib/pop3.js`), `tzekos`
+(webmail agent API), `provider` (AgentMail or the v0.1 tzmail cookie login).
+Message ids are `account:folder:uid`. Sending: SMTP accounts compose once
+(MailComposer), deliver, and append the same bytes to Sent (except Gmail);
+API accounts use `lib/providers.js`; Tzekos Mail uses the agent API.
 
-- `enabled()` — whether the provider has the required credentials
-- `name()` — human-readable provider name
-- `send(ctx, msg)` — send an email, returns `{ messageId, from }`
-- `recent(ctx, limit)` — read recent inbox messages (optional)
-- `fetch(ctx, id)` — fetch a single message (optional)
-- `domains(ctx)` — list sending domains/inboxes (optional)
+## Cache
 
-Providers: lettermint, agentmail, resend, ovh, smtp, local.
+`lib/cache.js` uses `node:sqlite` (`~/.dsh/mail/cache.db`, 0600) with tables
+`folders`, `messages`, `threads`, `meta`; an in-memory backend with the same
+API is used when `node:sqlite` is missing. Folder sync: UIDVALIDITY check
+(drop on change), initial `SEARCH SINCE` window capped to the newest N, then
+`maxUid+1:*`; flags and expunges are refreshed for the cached UID range.
+Snippets come from the first 6 KB of each message. Threads: References and
+In-Reply-To, then normalised subject for replies within 60 days. Bodies are
+cached as text only, on open; the retention job prunes them hourly.
 
-### staging.js
+## Routes
 
-Queue management. The `Queue` class stores entries as JSON files in
-`~/.dsh/dsh-mail/queue/`. Each entry has a status: `queued`, `scheduled`,
-`sent`, `failed`, `cancelled`.
+Reads (`GET /session`, `/state`, `/accounts`, `/folders`, `/messages`,
+`/thread`, `/message`, `/attachment`, `/events`) pass `checkReadRequest`;
+every `POST` passes `checkMutateRequest` (token, same-origin, cookie). The
+v0.1 `PUT /settings` (CSRF header only) is gone. Errors are scrubbed of every
+known secret value.
 
-Also provides:
-- `parseCSV(text, maxRows)` — parse CSV with header row
-- `personalise(template, row)` — `{column_name}` placeholder substitution
-- `slugify(str)` — filesystem-safe slug
+## Review queue
 
-### security.js
-
-4-layer route security, adapted from dsh-hpc:
-
-1. **Loopback** — requests must come from 127.0.0.1
-2. **Trust fence** — Host header must be in `trustedHosts`
-3. **Capability token** — `x-dsh-mail-token` header must match a signed token
-4. **Harness cookie** — `requireHarnessCookie` validates the session cookie
-
-`checkReadRequest` checks layers 1-2; `checkMutateRequest` checks all 4.
-
-## Browser half (src/)
-
-### client.jsx
-
-React component rendered in the sidebar. Four sections:
-- **Overview** — provider status cards, queue summary
-- **Queue** — list of queue entries with Send-now / Cancel actions
-- **Send** — compose and send a test email
-- **Settings** — configure provider credentials and limits
-
-Styled with `--dsh-alias-*` design tokens to match the harness theme.
-
-Built with esbuild (`scripts/build.mjs`) into `lib/client.js`, wrapped in a
-`window.__ModuleLoader__.load()` factory.
-
-## Data flow
-
-```
-Agent calls mail_send
-  → index.js execute()
-  → getProvider(settings, providerId)
-  → provider.send(ctx, msg)
-  → HTTP API to provider (Lettermint/AgentMail/Resend/SMTP)
-  → return { ok, messageId }
-
-Agent calls mail_mass_send
-  → parseCSV → for each row: personalise → provider.send → sleep(delayMs)
-  → or queue.create() if queueOnly=true
-
-Timer tick (every 30s)
-  → queue.due() → for each due entry: provider.send → queue.setStatus('sent')
-```
-
-## Security model
-
-- Agents can send single emails immediately (mail_send)
-- Mass sends and scheduled emails go through the queue
-- The sidebar tab provides human review (Send-now / Cancel)
-- All API routes require the trust fence + capability token
-- Credentials are never sent to the browser in plaintext (masked in /state)
-- Credential sources (read-only, merged at call time, settings win only when
-  non-empty): `~/.config/lettermint/credentials` → `lettermintApiKey`,
-  `~/.config/agentmail/credentials` → `agentmailApiKey` / `agentmailInbox`.
+`lib/staging.js` keeps queue entries as JSON files. The timer sends only
+`scheduled` entries whose time has come; `queued` entries wait for the tab.
+Agent drafts live in `lib/drafts.js` and show up in the same pane.

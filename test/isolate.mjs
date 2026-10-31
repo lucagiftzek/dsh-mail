@@ -6,7 +6,7 @@
  * needs credentials passes canary values explicitly. The opt-in live check
  * (DSH_MAIL_LIVE_CHECK=1) reads the real settings on purpose and prints ids only.
  */
-import { mkdtempSync, mkdirSync } from 'node:fs'
+import { mkdtempSync, mkdirSync, rmSync } from 'node:fs'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 
@@ -17,4 +17,5 @@ if (process.env.DSH_MAIL_LIVE_CHECK !== '1') {
   process.env.DSH_HOME = join(root, 'home')
   process.env.DSH_MAIL_DATA_DIR = join(root, 'data')
   mkdirSync(process.env.DSH_HOME, { recursive: true })
+  process.on('exit', () => { try { rmSync(root, { recursive: true, force: true }) } catch {} })
 }

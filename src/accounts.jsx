@@ -17,8 +17,10 @@ const TEMPLATES = {
   lettermint: { receive: { protocol: 'none' }, send: { protocol: 'api' }, auth: { method: 'api-key' }, api: { baseUrl: '' } },
   resend: { receive: { protocol: 'none' }, send: { protocol: 'api' }, auth: { method: 'api-key' }, api: { baseUrl: '' } },
   agentmail: { receive: { protocol: 'api' }, send: { protocol: 'api' }, auth: { method: 'api-key' }, api: { inbox: '', baseUrl: '' } },
+  sendgrid: { receive: { protocol: 'none' }, send: { protocol: 'api' }, auth: { method: 'api-key' }, api: { baseUrl: '' }, inbound: { enabled: false } },
 }
 const NOTES = {
+  sendgrid: 'Twilio SendGrid: an API key with Mail Send permission and a verified sender. EU data residency: base URL https://api.eu.sendgrid.com. Inbound Parse (receiving) is optional and off by default.',
   google: 'Simplest: an app password (needs 2-Step Verification; Google Account, Security, App passwords). For Workspace accounts without app passwords, use OAuth2 with your own Google Cloud OAuth client.',
   microsoft: 'Microsoft only accepts OAuth2 for IMAP and SMTP. You register your own app in Microsoft Entra (free) and connect once.',
   'pop3-smtp': 'POP3 has no server folders or flags: read state is kept locally. Messages are left on the server.',
@@ -26,6 +28,20 @@ const NOTES = {
   lettermint: 'Send only. API key from the Lettermint dashboard.',
   resend: 'Send only. API key from the Resend dashboard.',
   agentmail: 'API key and the inbox id.',
+}
+
+/** A new account pre-filled from a server preset (hosts, ports, security, quirks). */
+export function fromPreset(p) {
+  const type = p.type || 'imap-smtp'
+  const a = blank(type)
+  a.label = p.label
+  a.preset = p.id
+  if (p.receive && p.receive.imap) a.receive = { protocol: 'imap', ...p.receive.imap }
+  else if (p.receive && p.receive.pop3) a.receive = { protocol: 'pop3', ...p.receive.pop3, leaveOnServer: true }
+  if (p.send && p.send.host !== undefined) a.send = { protocol: 'smtp', ...p.send }
+  if (p.allowSelfSigned) a.allowSelfSigned = true
+  if (p.auth === 'app-password' && type === 'google') a.auth = { method: 'app-password' }
+  return a
 }
 
 function blank(type) {
@@ -161,7 +177,28 @@ function OAuthPanel({ a, set, isNew, initial, saveFirst }) {
   )
 }
 
-function AccountForm({ initial, isNew, types, onDone, onCancel }) {
+function SendgridInbound({ a, set, saved }) {
+  const [url, setUrl] = useState('')
+  const [err, setErr] = useState('')
+  async function gen() {
+    setErr('')
+    try { const r = await apiPost('/accounts/webhook-secret', { account: a.id }); setUrl(location.origin + r.path) } catch (e) { setErr(e.message) }
+  }
+  return (
+    <div className="mlx-acc" style={{ background: 'var(--l2)' }}>
+      <Check checked={a.inbound && a.inbound.enabled} onChange={v => set('inbound.enabled', v)}>Receive mail through SendGrid Inbound Parse (advanced, needs a public https address)</Check>
+      {a.inbound && a.inbound.enabled ? <>
+        <div className="mlx-s" style={{ margin: '4px 0' }}>In SendGrid: Settings, Inbound Parse, add your receiving domain (MX records to mx.sendgrid.net) and paste the URL below as the destination; tick "POST the raw, full MIME message". Incoming mail is only stored in the local cache; it never triggers agent actions.</div>
+        <button type="button" className="mlx-btn" disabled={!saved} onClick={() => void gen()}>{a.secrets.webhookSecret === '__set__' ? 'Generate a new webhook URL' : 'Generate the webhook URL'}</button>
+        {!saved ? <span className="mlx-s"> Save the account first.</span> : null}
+        {url ? <Field label="Webhook URL (shown once; it contains the secret)"><input className="mlx-in mlx-mono" readOnly value={url} onFocus={e => e.target.select()} /></Field> : null}
+        {err ? <div className="mlx-note bad">{err}</div> : null}
+      </> : null}
+    </div>
+  )
+}
+
+function AccountForm({ initial, isNew, types, presets, onDone, onCancel }) {
   const [a, setA] = useState(initial)
   const [busy, setBusy] = useState('')
   const [msg, setMsg] = useState(null)
@@ -199,8 +236,14 @@ function AccountForm({ initial, isNew, types, onDone, onCancel }) {
     catch (e) { setMsg({ tone: 'bad', text: e.message }) } finally { setBusy('') }
   }
   const typeInfo = (types || []).find(x => x.id === t)
+  const presetInfo = a.preset && presets ? presets.find(p => p.id === a.preset) : null
   return (
     <div className="mlx-acc">
+      {presetInfo ? <div className="mlx-note" style={{ margin: '0 0 8px' }}>
+        <div className="mlx-flex"><b>{presetInfo.label}</b><span className="mlx-pill">{presetInfo.region}</span>{presetInfo.verified ? <span className="mlx-pill" style={{ color: 'var(--ok)' }}>servers checked</span> : <span className="mlx-pill" style={{ color: 'var(--warn)' }}>unverified</span>}</div>
+        <div className="mlx-s" style={{ marginTop: 4 }}>{presetInfo.notes}</div>
+        {presetInfo.docs ? <a className="mlx-s" href={presetInfo.docs} target="_blank" rel="noreferrer noopener">Provider documentation</a> : null}
+      </div> : null}
       {NOTES[t] ? <div className="mlx-s" style={{ marginBottom: 8 }}>{NOTES[t]}</div> : null}
       {typeInfo && typeInfo.unsupported ? <div className="mlx-note warn">{typeInfo.unsupported}</div> : null}
       <div className="mlx-grid">
@@ -236,7 +279,8 @@ function AccountForm({ initial, isNew, types, onDone, onCancel }) {
         <Field label="Webmail base URL"><input className="mlx-in mlx-mono" value={(a.api && a.api.baseUrl) || ''} onChange={e => set('api.baseUrl', e.target.value.trim())} placeholder="https://mail.example.com" /></Field>
         <Field label="Service token"><SecretInput value={a.secrets.apiKey} onChange={v => set('secrets.apiKey', v)} /></Field>
       </div> : null}
-      {['lettermint', 'resend', 'agentmail'].includes(t) ? <div className="mlx-grid">
+      {t === 'sendgrid' ? <SendgridInbound a={a} set={set} saved={saved} /> : null}
+      {['lettermint', 'resend', 'agentmail', 'sendgrid'].includes(t) ? <div className="mlx-grid">
         <Field label="API key"><SecretInput value={a.secrets.apiKey} onChange={v => set('secrets.apiKey', v)} /></Field>
         {t === 'agentmail' ? <Field label="Inbox"><input className="mlx-in mlx-mono" value={(a.api && a.api.inbox) || ''} onChange={e => set('api.inbox', e.target.value.trim())} /></Field> : null}
         <Field label="API base URL" hint="Empty: the provider default"><input className="mlx-in mlx-mono" value={(a.api && a.api.baseUrl) || ''} onChange={e => set('api.baseUrl', e.target.value.trim())} /></Field>
@@ -258,7 +302,11 @@ function AccountForm({ initial, isNew, types, onDone, onCancel }) {
         <Check checked={a.enabled} onChange={v => set('enabled', v)}>Enabled</Check>
         <Check checked={a.isDefaultSender} onChange={v => set('isDefaultSender', v)}>Default sender in the composer</Check>
       </div>
-      <Field label="Max recipients per message"><input className="mlx-in" type="number" style={{ maxWidth: 140 }} value={(a.limits && a.limits.maxRecipients) || 500} onChange={e => set('limits.maxRecipients', Number(e.target.value))} /></Field>
+      <div className="mlx-grid">
+        <Field label="Max recipients per message"><input className="mlx-in" type="number" value={(a.limits && a.limits.maxRecipients) || 500} onChange={e => set('limits.maxRecipients', Number(e.target.value))} /></Field>
+        <Field label="Messages per minute" hint="0 = no limit"><input className="mlx-in" type="number" min="0" value={a.limits && a.limits.perMinute != null ? a.limits.perMinute : 20} onChange={e => set('limits.perMinute', Number(e.target.value))} /></Field>
+        <Field label="Messages per day" hint="0 = no limit"><input className="mlx-in" type="number" min="0" value={a.limits && a.limits.perDay != null ? a.limits.perDay : 300} onChange={e => set('limits.perDay', Number(e.target.value))} /></Field>
+      </div>
       {msg ? <div className={'mlx-note ' + msg.tone} style={{ margin: '8px 0' }}>
         <div>{msg.text}</div>
         {(msg.steps || []).map(s => <div key={s.step} className="mlx-s">{s.ok ? 'OK' : 'FAILED'} · {s.step}: {s.detail}</div>)}
@@ -274,7 +322,28 @@ function AccountForm({ initial, isNew, types, onDone, onCancel }) {
   )
 }
 
-const ADD_ORDER = ['imap-smtp', 'pop3-smtp', 'google', 'microsoft', 'tzekos', 'lettermint', 'resend', 'agentmail', 'local']
+const ADD_ORDER = ['imap-smtp', 'pop3-smtp', 'google', 'microsoft', 'tzekos', 'lettermint', 'resend', 'sendgrid', 'agentmail', 'local']
+
+function SuppressionList() {
+  const [list, setList] = useState(null)
+  const [add, setAdd] = useState('')
+  const [err, setErr] = useState('')
+  const load = () => apiGet('/suppress').then(r => setList(r.addresses)).catch(e => setErr(e.message))
+  useEffect(() => { void load() }, [])
+  const post = async body => { setErr(''); try { const r = await apiPost('/suppress', body); setList(r.addresses); setAdd('') } catch (e) { setErr(e.message) } }
+  return (
+    <div className="mlx-acc">
+      <b>Suppression list</b>
+      <div className="mlx-s" style={{ margin: '4px 0' }}>Mass sends skip these addresses (or whole @domains). Hard bounces are added automatically.</div>
+      <div className="mlx-flex"><input className="mlx-in" style={{ flex: 1 }} value={add} onChange={e => setAdd(e.target.value)} placeholder="name@example.com or @example.com" /><button type="button" className="mlx-btn" disabled={!add} onClick={() => void post({ add })}>Add</button></div>
+      {err ? <div className="mlx-note bad">{err}</div> : null}
+      <div style={{ maxHeight: 160, overflow: 'auto', marginTop: 6 }}>
+        {(list || []).map(x => <div key={x} className="mlx-flex"><span className="mlx-mono" style={{ flex: 1 }}>{x}</span><button type="button" className="mlx-btn" onClick={() => void post({ remove: x })}>Remove</button></div>)}
+        {list && !list.length ? <div className="mlx-s">Empty.</div> : null}
+      </div>
+    </div>
+  )
+}
 
 export function AccountsEditor({ onChanged }) {
   const [data, setData] = useState(null)
@@ -283,6 +352,24 @@ export function AccountsEditor({ onChanged }) {
   const [note, setNote] = useState('')
   const [testing, setTesting] = useState({})
   const [glob, setGlob] = useState(null)
+  const [presets, setPresets] = useState([])
+  const [pick, setPick] = useState('type:imap-smtp')
+  const [conv, setConv] = useState(null)
+  useEffect(() => { apiGet('/presets').then(r => setPresets(r.presets)).catch(() => {}) }, [])
+  async function convert() {
+    if (!window.confirm('Convert the legacy provider settings into editable accounts?\n\nThe same account ids are kept, so old chats keep working. Today\'s agent behaviour is pinned (confirm mode, default account, first-contact check). A backup of your settings is written first. Secrets that sit in the settings move into the private secrets file; keys in credential files stay there.')) return
+    setErr('')
+    try { const r = await apiPost('/accounts/convert', { confirm: true }); setConv(r); await load(); if (onChanged) onChanged() } catch (e) { setErr(e.message) }
+  }
+  function startAdd() {
+    if (pick.startsWith('preset:')) {
+      const p = presets.find(x => x.id === pick.slice(7))
+      if (!p) return
+      if (p.unsupported) { setErr(p.unsupported); return }
+      setEdit({ account: fromPreset(p), isNew: true })
+    } else setEdit({ account: blank(pick.slice(5)), isNew: true })
+    setNote('')
+  }
   const load = async () => { try { const r = await apiGet('/accounts'); setData(r); setGlob({ confirmMode: r.settings.agents.confirmMode || '', defaultProvider: r.settings.defaultProvider || '', retentionDays: r.settings.cache.retentionDays }); setErr('') } catch (e) { setErr(e.message) } }
   useEffect(() => { void load() }, [])
   if (!data) return <div className="mlx-pad">{err ? <div className="mlx-note bad">{err}</div> : 'Loading accounts...'}</div>
@@ -303,7 +390,8 @@ export function AccountsEditor({ onChanged }) {
     <div className="mlx-sec">
       {err ? <div className="mlx-note bad">{err}</div> : null}
       {note ? <div className="mlx-note ok">{note}</div> : null}
-      {edit ? <AccountForm initial={edit.account} isNew={edit.isNew} types={data.types} onDone={m => void done(m)} onCancel={() => setEdit(null)} /> : <>
+      {conv ? <div className="mlx-note ok">Converted: {conv.converted.join(', ') || 'none'}{conv.skipped.length ? '. Kept as legacy: ' + conv.skipped.map(x => x.id + ' (' + x.reason + ')').join(', ') : ''}. Backups: {conv.backups.join(', ')}. Pinned: {Object.entries(conv.pins).map(([k, v]) => k + ' = ' + v).join(', ') || 'nothing'}.</div> : null}
+      {edit ? <AccountForm initial={edit.account} isNew={edit.isNew} types={data.types} presets={presets} onDone={m => void done(m)} onCancel={() => setEdit(null)} /> : <>
         {all.length === 0 ? <div className="mlx-empty">Add your first account: any IMAP or POP3 mailbox, Gmail with an app password, or a sending service.</div> : null}
         {data.accounts.map(a => (
           <div key={a.id} className="mlx-acc">
@@ -320,7 +408,8 @@ export function AccountsEditor({ onChanged }) {
           </div>
         ))}
         {data.legacy.length ? <div className="mlx-note warn">
-          <b>Legacy provider settings in use.</b> These accounts come from the v0.1 provider settings and the credential files, read only here. They keep working unchanged; converting them to editable accounts arrives in the next release.
+          <b>Legacy provider settings in use.</b> These accounts come from the v0.1 provider settings and the credential files, read only here. They keep working unchanged. Converting them makes them editable here; it only happens when you press the button.
+          <div style={{ marginTop: 6 }}><button type="button" className="mlx-btn" onClick={() => void convert()}>Convert legacy settings to accounts</button></div>
         </div> : null}
         {data.legacy.map(a => (
           <div key={a.id} className="mlx-acc">
@@ -334,10 +423,18 @@ export function AccountsEditor({ onChanged }) {
           </div>
         ))}
         <div className="mlx-flex" style={{ margin: '6px 0 12px' }}>
-          <select className="mlx-in" style={{ width: 'auto' }} id="mlx-addtype" defaultValue="imap-smtp" aria-label="Account type">
-            {ADD_ORDER.map(id => { const t = data.types.find(x => x.id === id); return t ? <option key={id} value={id}>{t.label}</option> : null })}
+          <select className="mlx-in" style={{ width: 'auto', maxWidth: '100%' }} value={pick} onChange={e => setPick(e.target.value)} aria-label="Provider or account type">
+            <optgroup label="European providers">
+              {presets.filter(p => p.region !== 'global').map(p => <option key={p.id} value={'preset:' + p.id} disabled={!!p.unsupported}>{p.label} ({p.region}){p.unsupported ? ', not supported' : p.verified ? '' : ', unverified'}</option>)}
+            </optgroup>
+            <optgroup label="Other providers">
+              {presets.filter(p => p.region === 'global').map(p => <option key={p.id} value={'preset:' + p.id}>{p.label}{p.verified ? '' : ', unverified'}</option>)}
+            </optgroup>
+            <optgroup label="Account types">
+              {ADD_ORDER.map(id => { const t = data.types.find(x => x.id === id); return t ? <option key={id} value={'type:' + id}>{t.label}</option> : null })}
+            </optgroup>
           </select>
-          <button type="button" className="mlx-btn p" onClick={() => { const el = typeof document !== 'undefined' ? document.getElementById('mlx-addtype') : null; setEdit({ account: blank(el ? el.value : 'imap-smtp'), isNew: true }); setNote('') }}>Add account</button>
+          <button type="button" className="mlx-btn p" onClick={startAdd}>Add account</button>
         </div>
         {glob ? <div className="mlx-acc">
           <b>Agents and cache</b>
@@ -356,6 +453,7 @@ export function AccountsEditor({ onChanged }) {
           </div>
           <button type="button" className="mlx-btn" onClick={() => void saveGlobal()}>Save</button>
         </div> : null}
+        <SuppressionList />
       </>}
     </div>
   )

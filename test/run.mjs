@@ -22,7 +22,8 @@ import { MailCache, parseQuery, normSubject } from '../lib/cache.js'
 import { unstuff } from '../lib/pop3.js'
 import { parseId, makeId, safeName } from '../lib/service.js'
 import { assertNoInjection, validateRecipients } from '../lib/smtp.js'
-import { SettingsStore, readLegacyYamlBlock, mergeLayers } from '../lib/settings-store.js'
+import { createSettingsStore, readLegacyYamlBlock, mergeLayers } from '../lib/settings-store.js'
+import { SecretStore } from '../lib/secrets.js'
 
 const TMP = mkdtempSync(join(tmpdir(), 'dsh-mail-test-'))
 
@@ -139,14 +140,14 @@ await test('pop3 dot-unstuffing', () => {
   assert.equal(unstuff(Buffer.from('a\r\n..b\r\nc')).toString(), 'a\r\n.b\r\nc\r\n')
 })
 
-section('settings-store.js (DSH 0.2.x file mode)')
+section('settings-store.js (config mode: no settings service)')
 await test('file mode layers: defaults < settings.yaml.imported block < cordis config < settings.json; update writes 0600 JSON', async () => {
   const home = join(TMP, 'dshhome'); mkdirSync(home, { recursive: true })
   writeFileSync(join(home, 'settings.yaml.imported'), 'other: 1\ndsh-mail:\n  trustedHosts:\n    - llm.example.org\n  mailboxBaseUrl: https://mail.example.org\n  providers:\n    tzmail:\n      tzmailBaseURL: https://mail.example.org\n')
   assert.equal(readLegacyYamlBlock(home, 'dsh-mail').file, 'settings.yaml.imported')
   const dataDir = join(TMP, 'data-store')
-  const st = new SettingsStore({ ctx: {}, config: { maxRecipients: 42 }, ns: 'dsh-mail', schema: null, defaults: { maxRecipients: 500, trustedHosts: [], agents: { enabled: true } }, dataDir, dshHome: home })
-  assert.equal(st.mode, 'file')
+  const st = createSettingsStore({}, { maxRecipients: 42 }, { ns: 'dsh-mail', schema: null, defaults: { maxRecipients: 500, trustedHosts: [], agents: { enabled: true } }, dataDir, dshHome: home, secrets: new SecretStore(join(dataDir, 'secrets.json')), log: () => {}, warn: () => {} })
+  assert.equal(st.mode, 'config')
   let v = st.get()
   assert.deepEqual(v.trustedHosts, ['llm.example.org']); assert.equal(v.maxRecipients, 42); assert.equal(v.mailboxBaseUrl, 'https://mail.example.org')
   await st.update({ agents: { confirmMode: 'reply-only' }, accounts: [{ id: 'x' }] })
@@ -170,6 +171,8 @@ await import('./accounts.test.mjs')
 await import('./routes.test.mjs')
 await import('./e2e.test.mjs')
 await import('./oauth.test.mjs')
+await import('./dual.test.mjs')
+await import('./phase3.test.mjs')
 
 rmSync(TMP, { recursive: true, force: true })
 console.log('\n' + stats.passed + ' passed, ' + stats.failed + ' failed' + (stats.failed ? ': ' + stats.failures.join('; ') : ''))

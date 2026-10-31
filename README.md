@@ -11,7 +11,7 @@ Everything runs on your DSH host: mail is fetched straight from your own
 servers into a local cache, nothing is sent anywhere else, and there is no
 telemetry.
 
-## What is in version 0.2 (phases 1 and 2 of v2)
+## What is in version 0.2 (phases 1 to 3 of v2)
 
 - **Accounts** in DSH Settings: a "Mail" settings section (and the gear in the
   tab) to add, edit, test and remove accounts. Several accounts at once.
@@ -38,8 +38,16 @@ telemetry.
   rest, automatic refresh, a Reconnect banner, the Microsoft device code
   sign-in, and Microsoft Graph sendMail when a tenant disabled SMTP AUTH.
 
-Coming next: the EU provider presets and SendGrid (phase 3), IMAP IDLE push,
-full-text search, rich compose and undo send (phase 4).
+- **Presets, SendGrid, safer bulk mail** (phase 3): server presets for 26
+  providers (European first, each checked by a probe script), Twilio SendGrid
+  (send, optional Inbound Parse webhook), mass-send hardening
+  (List-Unsubscribe with One-Click, suppression list, per-account rate limits,
+  jitter, a circuit breaker, dry run), a first-contact check for agents, a
+  local audit log, `mail_forward`, and an explicit "Convert legacy settings to
+  accounts" button. Settings work on DSH 0.1 and DSH 0.2.
+
+Coming next (phase 4): IMAP IDLE push, full-text search, rich compose and
+undo send.
 
 ## Accounts
 
@@ -56,6 +64,7 @@ API call) and reports each step; it never shows a secret.
 | Self-hosted | IMAP or POP3 | SMTP | password; plaintext allowed only to a loopback host |
 | Tzekos Mail | webmail `/api/agent` | same API | service token (never a user password) |
 | Lettermint, Resend | none | API | API key |
+| Twilio SendGrid | optional Inbound Parse webhook | API v3 | API key |
 | AgentMail | API inbox | API | API key + inbox id |
 
 Settings shape (`dsh-mail` namespace):
@@ -69,18 +78,36 @@ dsh-mail:
       address: me@example.com
       receive: { protocol: imap, host: imap.example.com, port: 993, security: tls }
       send:    { protocol: smtp, host: smtp.example.com, port: 465, security: tls }
-      secrets: { password: "..." }        # or passwordFile: /path, or passwordEnv: NAME
+      passwordFile: /path/to/secret     # optional; or passwordEnv: NAME, or type it in the editor
       agent: { allow: true, canRead: true, canSend: true, canMass: false, default: true }
-      limits: { maxRecipients: 500 }
+      limits: { maxRecipients: 500, perMinute: 20, perDay: 300 }   # 0 = no limit
   agents:
     confirmMode: all            # all | reply-only
   cache:
     retentionDays: 90           # 0 = headers only, -1 = keep
 ```
 
-**Secrets** are returned to the browser only as `__set__` (stored) or empty.
-Saving `__set__` keeps the stored value; typing a new value replaces it. Prefer
-`passwordFile` or `passwordEnv` so no password sits in a settings file.
+**Secrets** (passwords, API keys, OAuth client secrets) are never stored in
+`settings.yaml` or in the DSH 0.2 profile row: the editor writes them to the
+plugin's own `~/.dsh/mail/secrets.json` (mode 0600, directory 0700). Routes
+return them only as `__set__` (stored) or empty; saving `__set__` keeps the
+stored value, typing a new one replaces it. `passwordFile` / `passwordEnv`
+and, for API keys, `apiKeyFile` + `apiKeyVar` (a `KEY=value` credentials file)
+keep a secret in a file you manage. OAuth tokens live encrypted in
+`tokens.enc`.
+
+**Presets.** "Add account" lists European providers first (Posteo,
+mailbox.org, Infomaniak, Migadu, Runbox, Soverin, StartMail, Mailfence, Mailo,
+mail.de, GMX, WEB.DE, eclipso, Hostpoint, Inbox.eu, Kolab Now, OVH, IONOS,
+hosting mail, Proton Mail through Bridge, Zoho EU), then Gmail, Outlook,
+iCloud, Yahoo and Fastmail. A preset fills hosts, ports and TLS and shows the
+provider's quirk (app passwords, an "enable IMAP" switch). Tuta is listed as
+not supported (it offers no IMAP or SMTP). Proton Mail needs Proton Mail Bridge
+on the same host or LAN; use the password Bridge generates; the preset accepts
+Bridge's self-signed certificate. `npm run probe-presets` checks every host
+(TCP + TLS handshake, `--docs` also the documentation pages, `--write`
+updates the `verified` flags); rows that did not answer show "unverified".
+The last run is in [docs/presets-probe.md](docs/presets-probe.md).
 
 **Agents** see an account only when `agent.allow` is on (new accounts start
 off). `canRead`, `canSend` and `canMass` narrow it further, and
@@ -151,6 +178,42 @@ expired grant marks the account "needs to reconnect" and the tab shows a
 has no revocation endpoint; remove the app under My Apps) and deletes it
 locally.
 
+### Twilio SendGrid
+
+Account type SendGrid sends through the v3 Mail Send API (API key with Mail
+Send permission and a verified sender; EU data residency: base URL
+`https://api.eu.sendgrid.com`). Receiving is optional and off by default:
+tick "Receive mail through SendGrid Inbound Parse", save, press **Generate the
+webhook URL** (shown once; it carries a per-account secret), and set it as the
+Inbound Parse destination with "POST the raw, full MIME message". This needs a
+public https address for the DSH host. Incoming mail only goes into the local
+cache; it never triggers agent actions.
+
+### Mass sending and agent guard rails
+
+- More than 50 recipients (`mass.unsubscribeAbove`) need an unsubscribe
+  address: `unsubscribe: "mailto:...", "https://...?e={email}"` adds
+  `List-Unsubscribe`, plus `List-Unsubscribe-Post: List-Unsubscribe=One-Click`
+  for https; every mass message carries `Precedence: bulk`. Accounts that
+  cannot set headers (Tzekos Mail, AgentMail) refuse such batches.
+- The suppression list `~/.dsh/mail/suppress.txt` (an address or `@domain`
+  per line; also in the settings) is skipped by mass sends and fed by hard
+  bounces (5.1.x).
+- Per-account limits `perMinute` / `perDay` (0 = no limit); a send over the
+  limit returns `rate limit: ...` with `retryAfterSec`. Mass sends wait for
+  the next minute and stop at the daily limit. Delays get a random +-20 %
+  (`mass.jitterPct`); 5 consecutive failures stop the batch
+  (`mass.breakerFailures`).
+- `mail_mass_send({ dryRun: true })` previews the first 3 rendered messages,
+  the suppressed count and the remaining budget, and sends nothing.
+- `agents.firstContactConfirm` (default on): an agent's first message to a
+  recipient domain the account never wrote to or heard from becomes a draft
+  until `confirm: true`, even in `reply-only` mode.
+- Audit log `~/.dsh/mail/audit.jsonl` (0600): time, actor (agent, human,
+  timer, webhook), account, action, recipient count and a hash of the subject;
+  never bodies. Shown under "Recent activity" in the Queue pane and at
+  `GET /audit`.
+
 ### Upgrading from v0.1
 
 Nothing has to change. When no explicit account uses their ids, the v0.1
@@ -167,28 +230,41 @@ before upgrading is recommended:
 ```yaml
 dsh-mail:
   defaultProvider: lettermint
-  agents: { confirmMode: reply-only }
+  agents: { confirmMode: reply-only, firstContactConfirm: false }
   schemaVersion: 1
 ```
+
+**Convert legacy settings to accounts** (Settings, Mail) turns the virtual
+accounts into editable ones with the same ids. It runs only when you press the
+button and confirm. It writes a backup of `settings.yaml` (when present) and of
+the current settings first. It pins today's agent behaviour (default account,
+confirm mode, first-contact check). Secrets that sat in the settings move into
+`secrets.json`; keys in credential files stay there and are referenced.
+Accounts that use the per-user webmail login are kept as legacy.
 
 Behaviour change: queue entries in state `queued` (manual queue) are no longer
 sent by the timer; they wait for **Send now** or **Approve** in the tab, as the
 v0.1 documentation already described.
 
-### DSH 0.2
+### DSH 0.1 and DSH 0.2
 
-On DSH versions without `ctx.settings.register`, settings are read from the
-plugin row config and from a plugin-owned file `<data dir>/settings.json`
-(mode 0600) that the settings editor writes through the plugin API; a v0.1
-`dsh-mail` block left in `settings.yaml` or `settings.yaml.imported` is still
-honoured as the lowest layer.
+Settings go through `lib/dual-settings.js` (shared with the other estate
+plugins). On DSH 0.1 the `dsh-mail` section of `settings.yaml` is a registered
+namespace. On DSH 0.2 the plugin exports a live `Config` (built with the running
+harness's schemastery, also on the default export). Every key of a v0.1 section
+is declared, so the old `dsh-mail:` section is imported once into the profile
+row; its secrets go to `secrets.json` first and never into the row. Writes use
+`ctx.settings.update`. Without a settings service (headless, or `settings` not
+injected), the plugin reads the row config, the old section and
+`~/.dsh/mail/settings.json`.
 
 ## Agent tools
 
 | Tool | What it does |
 |---|---|
 | `mail_send` | send one message (`account`/`provider`, `to`, `cc`, `bcc`, `subject`, `text`, `html`, `replyTo`, `attachments`, `draftId`, `confirm`) |
-| `mail_mass_send` | CSV-personalised bulk send with a delay; staged for review under draft-first |
+| `mail_mass_send` | CSV-personalised bulk send (`unsubscribe`, `dryRun`, `delayMs`); staged for review under draft-first |
+| `mail_forward` | forward a message with a note (`id`, `to`, `note`, `attachments: true` to include the originals); draft first |
 | `mail_send_later` | schedule a send (`sendAt`) or queue it for manual send |
 | `mail_read` | recent messages of any account that can read (`folder`, `unread`, `since`, `domain`, `address`) |
 | `mail_fetch` | one message as text, by composite id `account:folder:uid`, API id or thread id |
@@ -231,6 +307,7 @@ cd /path/to/dsh-mail
 npm install          # runtime dependencies + esbuild for the bundle
 npm run build        # verified build of src/*.jsx into lib/client.js
 npm test             # unit, route security and end-to-end tests
+DSH_GLOBAL_PREFIX=<prefix of a DSH 0.2 install> npm test   # also the DSH 0.2 settings tests
 ```
 
 Add the plugin to the web profile (`"dsh-mail": "link:/path/to/dsh-mail"` in
@@ -268,6 +345,12 @@ lib/cache.js           node:sqlite cache and threading
 lib/html.js            HTML sanitising for the reading view
 lib/tools.js           agent tools
 lib/drafts.js          local drafts
+lib/dual-settings.js   settings on DSH 0.1 and 0.2 (vendored, shared)
+lib/secrets.js         the 0600 secrets file
+lib/outbound.js        audit log, suppression, rate limits, mass send
+lib/presets.json       server presets (scripts/probe-presets.mjs checks them)
+lib/inbound.js         SendGrid Inbound Parse webhook
+lib/convert.js         "Convert legacy settings to accounts"
 lib/staging.js         review queue, CSV
 lib/providers.js       API providers (Lettermint, Resend, AgentMail, v0.1 transports)
 lib/mailbox.js         Tzekos Mail agent API client

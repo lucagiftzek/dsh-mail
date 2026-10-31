@@ -33,7 +33,7 @@ await test('no secret in any read response (state, accounts, folders, messages, 
   }
   const acc = (await request(p.port, 'GET', '/accounts')).json
   assert.equal(acc.accounts.find(a => a.id === 'work').secrets.password, '__set__')
-  assert.equal(acc.settingsStore.mode, 'file')
+  assert.equal(acc.settingsStore.mode, 'config')
 })
 await test('error messages from failing connections are scrubbed', async () => {
   const r = await mutate(p.port, '/accounts/test', { id: 'work' })
@@ -71,10 +71,10 @@ await test('attachments over 25 MB are refused', async () => {
 await test('accounts save keeps secrets on "__set__" through the route and never echoes them', async () => {
   const acc = (await request(p.port, 'GET', '/accounts')).json.accounts.find(a => a.id === 'work')
   const r = await mutate(p.port, '/accounts/save', { account: { ...acc, label: 'Work 2' } })
-  assert.equal(r.status, 200); noCanary('/accounts/save', r.text)
+  assert.equal(r.status, 200, r.text); noCanary('/accounts/save', r.text)
   const again = (await request(p.port, 'GET', '/accounts')).json.accounts.find(a => a.id === 'work')
   assert.equal(again.label, 'Work 2'); assert.equal(again.secrets.password, '__set__')
-  assert.equal(p.resolved().all.find(a => a.id === 'work').secrets.password, CANARY[0])
+  assert.ok(p.resolved().all.find(a => a.id === 'work').secrets.password === CANARY[0], 'secret resolved (value not printed)')
 })
 await test('tools: denied account returns the documented error; no accounts gives a clear error', async () => {
   const r = await p.tools.get('mail_send').execute({ account: 'tx', to: 'a@example.org', subject: 's', text: 't', confirm: true })
@@ -116,7 +116,7 @@ const fakeSettings = {
 const g = await bootPlugin({ dir: dir3, settings: {}, withDshSettings: fakeSettings })
 await test('settings come from ctx.settings and saves go through scope.update', async () => {
   const acc = (await request(g.port, 'GET', '/accounts')).json
-  assert.equal(acc.settingsStore.mode, 'dsh-settings')
+  assert.equal(acc.settingsStore.mode, 'register')
   assert.equal(acc.accounts[0].id, 'w2'); assert.equal(acc.accounts[0].secrets.password, '__set__')
   const r = await mutate(g.port, '/settings', { settings: { agents: { confirmMode: 'reply-only' } } })
   assert.equal(r.status, 200); assert.equal(section3.agents.confirmMode, 'reply-only')

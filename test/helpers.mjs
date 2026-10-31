@@ -4,26 +4,29 @@ import { createHash } from 'node:crypto'
 import { mkdirSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 
-export async function bootPlugin({ dir, settings = {}, withDshSettings = null }) {
+export async function bootPlugin({ dir, settings = {}, withDshSettings = null, extra = {}, strict = false, noSettingsFile = false, estateHome = null, mailboxCreds = null, config = {} }) {
   process.env.DSH_MAIL_DATA_DIR = join(dir, 'data')
   process.env.DSH_HOME = join(dir, 'home')
   process.env.DSH_MAIL_TEST_IDENTITY_TOOLS = '1'
-  process.env.DSH_MAIL_MAILBOX_CREDENTIALS = join(dir, 'no-mailbox-credentials')
-  process.env.DSH_MAIL_ESTATE_HOME = join(dir, 'no-estate-home')
+  process.env.DSH_MAIL_MAILBOX_CREDENTIALS = mailboxCreds || join(dir, 'no-mailbox-credentials')
+  process.env.DSH_MAIL_ESTATE_HOME = estateHome || join(dir, 'no-estate-home')
   mkdirSync(process.env.DSH_MAIL_DATA_DIR, { recursive: true })
   mkdirSync(process.env.DSH_HOME, { recursive: true })
-  writeFileSync(join(process.env.DSH_MAIL_DATA_DIR, 'settings.json'), JSON.stringify(settings))
+  if (!noSettingsFile) writeFileSync(join(process.env.DSH_MAIL_DATA_DIR, 'settings.json'), JSON.stringify(settings))
   const { apply } = await import('../lib/index.js')
   const tools = new Map()
   let route = null
   const disposers = []
-  const ctx = {
+  const base = {
     tools: { register: t => tools.set(t.name, t) },
     webServer: { register: r => { route = r; return () => {} } },
     effect: (fn) => { const d = fn(); if (typeof d === 'function') disposers.push(d) },
+    ...extra,
   }
-  if (withDshSettings) ctx.settings = withDshSettings
-  const api = apply(ctx, {})
+  if (withDshSettings) base.settings = withDshSettings
+  // strict: like cordis on DSH 0.2, reading a service that is not injected throws
+  const ctx = strict ? new Proxy(base, { get(t, k) { if (typeof k === 'symbol' || k in t) return t[k]; throw new TypeError('cannot get property "' + String(k) + '" without inject') } }) : base
+  const api = apply(ctx, config)
   const server = http.createServer((req, res) => route.handler(req, res))
   await new Promise(r => server.listen(0, '127.0.0.1', r))
   const port = server.address().port

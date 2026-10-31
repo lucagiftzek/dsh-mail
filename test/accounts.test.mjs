@@ -17,6 +17,7 @@ import {
 } from '../lib/accounts.js'
 import { DEFAULTS, resolveConfig, settingsSchema, loadSchemastery, upsertAccount, safeSettings } from '../lib/index.js'
 import { readLegacyYamlBlock } from '../lib/settings-store.js'
+import { plain } from '../lib/dual-settings.js'
 
 // The v0.1 block exactly as it is shaped on the maintainer's install (host names replaced).
 const V01_BLOCK = {
@@ -28,7 +29,7 @@ const ESTATE = { lettermintApiKey: 'lm-canary-key-123', agentmailApiKey: 'am-can
 const MAILBOX = { MAIL_AGENT_BASE_URL: 'https://mail.example.org', MAIL_AGENT_TOKEN: 'tz-canary-token-789' }
 const z = loadSchemastery()
 const schema = settingsSchema(z)
-const load = (block) => resolveConfig(schema ? schema(structuredClone({ ...DEFAULTS, ...block, providers: { ...DEFAULTS.providers, ...(block.providers || {}) } })) : { ...DEFAULTS, ...block })
+const load = (block) => resolveConfig(schema ? plain(schema(structuredClone({ ...DEFAULTS, ...block, providers: { ...DEFAULTS.providers, ...(block.providers || {}) } }))) : { ...DEFAULTS, ...block })
 
 section('accounts.js: legacy shim (migration of the v0.1 block, zero edits)')
 await test('schemastery is found and the v0.1 block validates against the v2 schema', () => {
@@ -76,7 +77,7 @@ await test('every v0.1 provider id resolves when its credentials exist', () => {
   for (const id of LEGACY_PROVIDER_IDS) assert.ok(findAccount(r, id), 'provider id ' + id + ' does not resolve')
   assert.equal(findAccount(r, 'ovh').send.host, 'ssl0.ovh.net')
   assert.equal(findAccount(r, 'smtp').receive.protocol, 'imap')
-  assert.equal(findAccount(r, 'smtp').secrets.password, 'smtp-canary-pass')
+  assert.ok(findAccount(r, 'smtp').secrets.password === 'smtp-canary-pass', 'secret resolved (value not printed)')
 })
 await test('fresh install (no block, no credential files): zero accounts, confirmMode all', () => {
   const s = load({})
@@ -101,11 +102,11 @@ await test('__set__ round trip: keep on "__set__", clear on "", replace on a new
   assert.equal(redacted.secrets.password, '__set__'); assert.equal(redacted.secrets.apiKey, '__set__'); assert.equal(redacted.secrets.webhookSecret, '')
   assert.ok(!JSON.stringify(redacted).includes('old-secret-pw'))
   const keep = upsertAccount(stored, { ...redacted, label: 'Work' })
-  assert.equal(keep.list[0].secrets.password, 'old-secret-pw'); assert.equal(keep.list[0].label, 'Work')
+  assert.equal(keep.secrets.password, 'old-secret-pw'); assert.equal(keep.list[0].secrets, undefined); assert.equal(keep.list[0].label, 'Work')
   const clear = upsertAccount(stored, { ...redacted, secrets: { ...redacted.secrets, apiKey: '' } })
-  assert.equal(clear.list[0].secrets.apiKey, undefined); assert.equal(clear.list[0].secrets.password, 'old-secret-pw')
+  assert.equal(clear.secrets.apiKey, undefined); assert.equal(clear.secrets.password, 'old-secret-pw')
   const repl = upsertAccount(stored, { ...redacted, secrets: { ...redacted.secrets, password: 'new-pw-1' } })
-  assert.equal(repl.list[0].secrets.password, 'new-pw-1')
+  assert.equal(repl.secrets.password, 'new-pw-1')
   assert.deepEqual(mergeSecrets({ password: '__set__' }, {}), {})
 })
 await test('validation: ids, plaintext only to loopback, microsoft refused, immutable ids', () => {

@@ -19,7 +19,8 @@
   "scripts": {
     "check": "for f in lib/*.js; do node --check $f || exit 1; done && node test/run.mjs",
     "build": "node scripts/build.mjs",
-    "test": "node test/run.mjs"
+    "test": "node test/run.mjs",
+    "probe-presets": "node scripts/probe-presets.mjs"
   },
   "engines": {
     "node": ">=22.5"

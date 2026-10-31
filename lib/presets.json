@@ -1,0 +1,665 @@
+[
+  {
+    "id": "posteo",
+    "label": "Posteo",
+    "region": "DE",
+    "type": "imap-smtp",
+    "receive": {
+      "imap": {
+        "host": "posteo.de",
+        "port": 993,
+        "security": "tls"
+      },
+      "pop3": {
+        "host": "posteo.de",
+        "port": 995,
+        "security": "tls"
+      }
+    },
+    "send": {
+      "host": "posteo.de",
+      "port": 465,
+      "security": "tls"
+    },
+    "auth": "password",
+    "notes": "Login is your full Posteo address. With two-factor authentication on, create a separate app password in the Posteo settings.",
+    "docs": "https://posteo.de/en/help/how-do-i-set-up-posteo-in-an-email-client-pop3-imap-and-smtp",
+    "verified": true
+  },
+  {
+    "id": "mailbox-org",
+    "label": "mailbox.org",
+    "region": "DE",
+    "type": "imap-smtp",
+    "receive": {
+      "imap": {
+        "host": "imap.mailbox.org",
+        "port": 993,
+        "security": "tls"
+      },
+      "pop3": {
+        "host": "pop.mailbox.org",
+        "port": 995,
+        "security": "tls"
+      }
+    },
+    "send": {
+      "host": "smtp.mailbox.org",
+      "port": 465,
+      "security": "tls"
+    },
+    "auth": "password",
+    "notes": "With two-factor authentication enabled an app-specific password is mandatory.",
+    "docs": "https://kb.mailbox.org/",
+    "verified": true
+  },
+  {
+    "id": "infomaniak",
+    "label": "Infomaniak",
+    "region": "CH",
+    "type": "imap-smtp",
+    "receive": {
+      "imap": {
+        "host": "mail.infomaniak.com",
+        "port": 993,
+        "security": "tls"
+      },
+      "pop3": {
+        "host": "mail.infomaniak.com",
+        "port": 995,
+        "security": "tls"
+      }
+    },
+    "send": {
+      "host": "mail.infomaniak.com",
+      "port": 465,
+      "security": "tls"
+    },
+    "auth": "password",
+    "notes": "A per-address application password is recommended when two-factor authentication is on.",
+    "docs": "https://www.infomaniak.com/en/support/faq/2036",
+    "verified": true
+  },
+  {
+    "id": "migadu",
+    "label": "Migadu",
+    "region": "CH",
+    "type": "imap-smtp",
+    "receive": {
+      "imap": {
+        "host": "imap.migadu.com",
+        "port": 993,
+        "security": "tls"
+      },
+      "pop3": {
+        "host": "pop.migadu.com",
+        "port": 995,
+        "security": "tls"
+      }
+    },
+    "send": {
+      "host": "smtp.migadu.com",
+      "port": 465,
+      "security": "tls"
+    },
+    "auth": "password",
+    "notes": "Login is the full mailbox address.",
+    "docs": "https://www.migadu.com/guides/",
+    "verified": true
+  },
+  {
+    "id": "runbox",
+    "label": "Runbox",
+    "region": "NO",
+    "type": "imap-smtp",
+    "receive": {
+      "imap": {
+        "host": "mail.runbox.com",
+        "port": 993,
+        "security": "tls"
+      },
+      "pop3": {
+        "host": "mail.runbox.com",
+        "port": 995,
+        "security": "tls"
+      }
+    },
+    "send": {
+      "host": "mail.runbox.com",
+      "port": 465,
+      "security": "tls"
+    },
+    "auth": "password",
+    "notes": "Password or app password (two-factor aware).",
+    "docs": "https://help.runbox.com/",
+    "verified": true
+  },
+  {
+    "id": "soverin",
+    "label": "Soverin",
+    "region": "NL",
+    "type": "imap-smtp",
+    "receive": {
+      "imap": {
+        "host": "imap.soverin.net",
+        "port": 993,
+        "security": "tls"
+      }
+    },
+    "send": {
+      "host": "smtp.soverin.net",
+      "port": 465,
+      "security": "tls"
+    },
+    "auth": "password",
+    "notes": "Account password.",
+    "docs": "https://soverin.net/",
+    "verified": true
+  },
+  {
+    "id": "startmail",
+    "label": "StartMail",
+    "region": "NL",
+    "type": "imap-smtp",
+    "receive": {
+      "imap": {
+        "host": "imap.startmail.com",
+        "port": 993,
+        "security": "tls"
+      }
+    },
+    "send": {
+      "host": "smtp.startmail.com",
+      "port": 465,
+      "security": "tls"
+    },
+    "auth": "app-password",
+    "notes": "IMAP and SMTP only work with an app password created in the StartMail settings.",
+    "docs": "https://support.startmail.com/",
+    "verified": true
+  },
+  {
+    "id": "mailfence",
+    "label": "Mailfence",
+    "region": "BE",
+    "type": "imap-smtp",
+    "receive": {
+      "imap": {
+        "host": "imap.mailfence.com",
+        "port": 993,
+        "security": "tls"
+      },
+      "pop3": {
+        "host": "pop.mailfence.com",
+        "port": 995,
+        "security": "tls"
+      }
+    },
+    "send": {
+      "host": "smtp.mailfence.com",
+      "port": 465,
+      "security": "tls"
+    },
+    "auth": "password",
+    "notes": "IMAP, POP3 and SMTP need a paid plan and must be enabled in the Mailfence settings.",
+    "docs": "https://mailfence.com/",
+    "verified": false
+  },
+  {
+    "id": "mailo",
+    "label": "Mailo",
+    "region": "FR",
+    "type": "imap-smtp",
+    "receive": {
+      "imap": {
+        "host": "mail.mailo.com",
+        "port": 993,
+        "security": "tls"
+      }
+    },
+    "send": {
+      "host": "mail.mailo.com",
+      "port": 465,
+      "security": "tls"
+    },
+    "auth": "password",
+    "notes": "IMAP and SMTP access must be enabled in the account settings; some plans limit it.",
+    "docs": "https://faq.mailo.com/",
+    "verified": true
+  },
+  {
+    "id": "mail-de",
+    "label": "mail.de",
+    "region": "DE",
+    "type": "imap-smtp",
+    "receive": {
+      "imap": {
+        "host": "imap.mail.de",
+        "port": 993,
+        "security": "tls"
+      }
+    },
+    "send": {
+      "host": "smtp.mail.de",
+      "port": 465,
+      "security": "tls"
+    },
+    "auth": "app-password",
+    "notes": "Needs a dedicated email client password created in the account settings.",
+    "docs": "https://mail.de/en/",
+    "verified": true
+  },
+  {
+    "id": "gmx",
+    "label": "GMX",
+    "region": "DE",
+    "type": "imap-smtp",
+    "receive": {
+      "imap": {
+        "host": "imap.gmx.net",
+        "port": 993,
+        "security": "tls"
+      },
+      "pop3": {
+        "host": "pop.gmx.net",
+        "port": 995,
+        "security": "tls"
+      }
+    },
+    "send": {
+      "host": "mail.gmx.net",
+      "port": 465,
+      "security": "tls"
+    },
+    "auth": "password",
+    "notes": "Enable \"POP3 and IMAP access\" in the GMX settings first; with two-factor authentication use an app password.",
+    "docs": "https://hilfe.gmx.net/pop-imap/einschalten.html",
+    "verified": true
+  },
+  {
+    "id": "web-de",
+    "label": "WEB.DE",
+    "region": "DE",
+    "type": "imap-smtp",
+    "receive": {
+      "imap": {
+        "host": "imap.web.de",
+        "port": 993,
+        "security": "tls"
+      },
+      "pop3": {
+        "host": "pop3.web.de",
+        "port": 995,
+        "security": "tls"
+      }
+    },
+    "send": {
+      "host": "smtp.web.de",
+      "port": 587,
+      "security": "starttls"
+    },
+    "auth": "password",
+    "notes": "Same enable switch as GMX; with two-factor authentication use an app password.",
+    "docs": "https://hilfe.web.de/pop-imap/imap/imap-serverdaten.html",
+    "verified": true
+  },
+  {
+    "id": "eclipso",
+    "label": "eclipso",
+    "region": "DE",
+    "type": "imap-smtp",
+    "receive": {
+      "imap": {
+        "host": "mail.eclipso.de",
+        "port": 993,
+        "security": "tls"
+      }
+    },
+    "send": {
+      "host": "mail.eclipso.de",
+      "port": 465,
+      "security": "tls"
+    },
+    "auth": "password",
+    "notes": "Account password.",
+    "docs": "https://www.eclipso.eu/",
+    "verified": true
+  },
+  {
+    "id": "hostpoint",
+    "label": "Hostpoint",
+    "region": "CH",
+    "type": "imap-smtp",
+    "receive": {
+      "imap": {
+        "host": "imap.mail.hostpoint.ch",
+        "port": 993,
+        "security": "tls"
+      }
+    },
+    "send": {
+      "host": "asmtp.mail.hostpoint.ch",
+      "port": 465,
+      "security": "tls"
+    },
+    "auth": "password",
+    "notes": "Mailbox password.",
+    "docs": "https://support.hostpoint.ch/",
+    "verified": true
+  },
+  {
+    "id": "inbox-eu",
+    "label": "Inbox.eu",
+    "region": "LV",
+    "type": "imap-smtp",
+    "receive": {
+      "imap": {
+        "host": "mail.inbox.eu",
+        "port": 993,
+        "security": "tls"
+      }
+    },
+    "send": {
+      "host": "mail.inbox.eu",
+      "port": 465,
+      "security": "tls"
+    },
+    "auth": "password",
+    "notes": "The free tier may restrict external mail clients.",
+    "docs": "https://www.inbox.eu/en/",
+    "verified": true
+  },
+  {
+    "id": "kolab-now",
+    "label": "Kolab Now",
+    "region": "CH",
+    "type": "imap-smtp",
+    "receive": {
+      "imap": {
+        "host": "imap.kolabnow.com",
+        "port": 993,
+        "security": "tls"
+      }
+    },
+    "send": {
+      "host": "smtp.kolabnow.com",
+      "port": 465,
+      "security": "tls"
+    },
+    "auth": "password",
+    "notes": "Groupware; mail through IMAP (calendars are not in scope).",
+    "docs": "https://docs.kolab.org/",
+    "verified": true
+  },
+  {
+    "id": "ovh",
+    "label": "OVH MX Plan",
+    "region": "FR",
+    "type": "imap-smtp",
+    "receive": {
+      "imap": {
+        "host": "ssl0.ovh.net",
+        "port": 993,
+        "security": "tls"
+      },
+      "pop3": {
+        "host": "ssl0.ovh.net",
+        "port": 995,
+        "security": "tls"
+      }
+    },
+    "send": {
+      "host": "ssl0.ovh.net",
+      "port": 465,
+      "security": "tls"
+    },
+    "auth": "password",
+    "notes": "Exchange and Email Pro mailboxes use pro1.mail.ovh.net instead.",
+    "docs": "https://help.ovhcloud.com/csm/en-emails-general-information-imap-pop-settings?id=kb_article_view&sysparm_article=KB0042925",
+    "verified": true
+  },
+  {
+    "id": "ionos",
+    "label": "IONOS",
+    "region": "DE",
+    "type": "imap-smtp",
+    "receive": {
+      "imap": {
+        "host": "imap.ionos.com",
+        "port": 993,
+        "security": "tls"
+      },
+      "pop3": {
+        "host": "pop.ionos.com",
+        "port": 995,
+        "security": "tls"
+      }
+    },
+    "send": {
+      "host": "smtp.ionos.com",
+      "port": 465,
+      "security": "tls"
+    },
+    "auth": "password",
+    "notes": "Regional hosts exist (.de, .fr, .es): use the one of your contract.",
+    "docs": "https://www.ionos.com/help/",
+    "verified": true
+  },
+  {
+    "id": "custom-host",
+    "label": "Hosting mail (Combell, Seeweb, Raidboxes, ...)",
+    "region": "EU",
+    "type": "imap-smtp",
+    "customHost": true,
+    "receive": {
+      "imap": {
+        "host": "",
+        "port": 993,
+        "security": "tls"
+      }
+    },
+    "send": {
+      "host": "",
+      "port": 465,
+      "security": "tls"
+    },
+    "auth": "password",
+    "notes": "Web hosting mail: the host is per customer domain, usually mail.<your domain>. See your hosting control panel.",
+    "docs": "https://european-alternatives.eu/category/email-providers",
+    "verified": false
+  },
+  {
+    "id": "proton-bridge",
+    "label": "Proton Mail (Bridge)",
+    "region": "CH",
+    "type": "imap-smtp",
+    "bridge": true,
+    "receive": {
+      "imap": {
+        "host": "127.0.0.1",
+        "port": 1143,
+        "security": "starttls"
+      }
+    },
+    "send": {
+      "host": "127.0.0.1",
+      "port": 1025,
+      "security": "starttls"
+    },
+    "auth": "bridge",
+    "allowSelfSigned": true,
+    "notes": "Proton Mail has no direct IMAP: run Proton Mail Bridge (paid plans) on this host or the LAN, headless with protonmail-bridge --cli. Use the username and the password that Bridge generates (not your account password). Bridge presents a self-signed certificate, so this preset accepts it for the Bridge host only.",
+    "docs": "https://proton.me/mail/bridge",
+    "verified": false
+  },
+  {
+    "id": "tuta",
+    "label": "Tuta (Tutanota)",
+    "region": "DE",
+    "type": "imap-smtp",
+    "unsupported": "Not supported: Tuta offers no IMAP, POP3 or SMTP access for third-party clients.",
+    "receive": {},
+    "send": {},
+    "auth": "none",
+    "notes": "Tuta only works in its own apps.",
+    "docs": "https://tuta.com/faq",
+    "verified": false
+  },
+  {
+    "id": "zoho-eu",
+    "label": "Zoho Mail (EU data centre)",
+    "region": "EU",
+    "type": "imap-smtp",
+    "receive": {
+      "imap": {
+        "host": "imap.zoho.eu",
+        "port": 993,
+        "security": "tls"
+      },
+      "pop3": {
+        "host": "pop.zoho.eu",
+        "port": 995,
+        "security": "tls"
+      }
+    },
+    "send": {
+      "host": "smtp.zoho.eu",
+      "port": 465,
+      "security": "tls"
+    },
+    "auth": "password",
+    "notes": "EU hosts end in .eu. IMAP must be enabled in the Zoho settings; with two-factor authentication use an app-specific password.",
+    "docs": "https://www.zoho.com/mail/help/imap-access.html",
+    "verified": true
+  },
+  {
+    "id": "gmail",
+    "label": "Gmail / Google Workspace",
+    "region": "global",
+    "type": "google",
+    "receive": {
+      "imap": {
+        "host": "imap.gmail.com",
+        "port": 993,
+        "security": "tls"
+      },
+      "pop3": {
+        "host": "pop.gmail.com",
+        "port": 995,
+        "security": "tls"
+      }
+    },
+    "send": {
+      "host": "smtp.gmail.com",
+      "port": 465,
+      "security": "tls"
+    },
+    "auth": "app-password",
+    "notes": "App password (2-Step Verification required) or OAuth2 with your own Google client.",
+    "docs": "https://support.google.com/mail/answer/7126229",
+    "verified": true
+  },
+  {
+    "id": "outlook",
+    "label": "Outlook.com / Microsoft 365",
+    "region": "global",
+    "type": "microsoft",
+    "receive": {
+      "imap": {
+        "host": "outlook.office365.com",
+        "port": 993,
+        "security": "tls"
+      },
+      "pop3": {
+        "host": "outlook.office365.com",
+        "port": 995,
+        "security": "tls"
+      }
+    },
+    "send": {
+      "host": "smtp.office365.com",
+      "port": 587,
+      "security": "starttls"
+    },
+    "auth": "oauth2",
+    "notes": "OAuth2 only (basic authentication is retired); register your own Entra app.",
+    "docs": "https://support.microsoft.com/en-us/office/pop-imap-and-smtp-settings-for-outlook-com-d088b986-291d-42b8-9564-9c414e2aa040",
+    "verified": true
+  },
+  {
+    "id": "icloud",
+    "label": "iCloud Mail",
+    "region": "global",
+    "type": "imap-smtp",
+    "receive": {
+      "imap": {
+        "host": "imap.mail.me.com",
+        "port": 993,
+        "security": "tls"
+      }
+    },
+    "send": {
+      "host": "smtp.mail.me.com",
+      "port": 587,
+      "security": "starttls"
+    },
+    "auth": "app-password",
+    "notes": "An app-specific password is mandatory (appleid.apple.com). The login is the part of your iCloud address before the @.",
+    "docs": "https://support.apple.com/en-us/102525",
+    "verified": true
+  },
+  {
+    "id": "yahoo",
+    "label": "Yahoo Mail",
+    "region": "global",
+    "type": "imap-smtp",
+    "receive": {
+      "imap": {
+        "host": "imap.mail.yahoo.com",
+        "port": 993,
+        "security": "tls"
+      },
+      "pop3": {
+        "host": "pop.mail.yahoo.com",
+        "port": 995,
+        "security": "tls"
+      }
+    },
+    "send": {
+      "host": "smtp.mail.yahoo.com",
+      "port": 465,
+      "security": "tls"
+    },
+    "auth": "app-password",
+    "notes": "An app password is mandatory.",
+    "docs": "https://help.yahoo.com/kb/SLN4075.html",
+    "verified": true
+  },
+  {
+    "id": "fastmail",
+    "label": "Fastmail",
+    "region": "global",
+    "type": "imap-smtp",
+    "receive": {
+      "imap": {
+        "host": "imap.fastmail.com",
+        "port": 993,
+        "security": "tls"
+      },
+      "pop3": {
+        "host": "pop.fastmail.com",
+        "port": 995,
+        "security": "tls"
+      }
+    },
+    "send": {
+      "host": "smtp.fastmail.com",
+      "port": 465,
+      "security": "tls"
+    },
+    "auth": "app-password",
+    "notes": "Create an app password with the IMAP and SMTP scope.",
+    "docs": "https://www.fastmail.help/hc/en-us/articles/360058753834",
+    "verified": true
+  }
+]

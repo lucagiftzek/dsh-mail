@@ -76,6 +76,21 @@ function Composer({ state, init, onClose, onSent }) {
   )
 }
 
+function AuditList() {
+  const [rows, setRows] = useState(null)
+  const [open, setOpen] = useState(false)
+  useEffect(() => { if (open) apiGet('/audit', { limit: 40 }).then(r => setRows(r.entries.reverse())).catch(() => setRows([])) }, [open])
+  return (
+    <details style={{ margin: '4px 10px' }} onToggle={e => setOpen(e.target.open)}>
+      <summary className="mlx-s" style={{ cursor: 'pointer' }}>Recent activity (audit log)</summary>
+      {(rows || []).map((r, i) => (
+        <div key={i} className="mlx-s mlx-mono" style={{ padding: '2px 0' }}>{r.ts.slice(5, 16).replace('T', ' ')} {r.actor} {r.action}{r.account ? ' ' + r.account : ''}{r.recipients != null ? ' to ' + r.recipients : ''}{r.ok === false ? ' FAILED' : ''}{r.note ? ' (' + r.note + ')' : ''}</div>
+      ))}
+      {rows && !rows.length ? <div className="mlx-s">Nothing yet.</div> : null}
+    </details>
+  )
+}
+
 function QueuePane({ state, reload, toast }) {
   const [busy, setBusy] = useState('')
   const act = async (path, body, okMsg) => {
@@ -98,6 +113,7 @@ function QueuePane({ state, reload, toast }) {
           </div>
         </div>
       ))}
+      <AuditList />
       <div className="mlx-h">Queue</div>
       {queue.length === 0 ? <div className="mlx-empty" style={{ padding: '6px 12px' }}>Scheduled and mass sends appear here for review.</div> : queue.map(q => {
         const tone = q.status === 'sent' ? 'var(--ok)' : q.status === 'failed' ? 'var(--bad)' : q.status === 'cancelled' ? 'var(--ink3)' : 'var(--warn)'

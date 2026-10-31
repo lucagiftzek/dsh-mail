@@ -80,3 +80,20 @@ capability secret) and refreshes per account and purpose (`mail`, Microsoft
 Microsoft accounts fall back to Graph `sendMail` with the MIME message when
 SMTP AUTH is refused (send mode `auto`) or always (`graph`). The device code
 flow polls in the background and is visible through `GET /oauth/status`.
+
+## Unsubscribe, push, search and compose (phase 4)
+
+`lib/unsub.js` signs per-recipient tokens (HKDF key from the capability
+secret, info "dsh-mail unsubscribe v1"; payload account, list, campaign,
+128-bit recipient hash). Campaign records (`campaigns/c-*.json`, 0600) hold the
+hash to address map and never leave the host. The public page handler is
+pure apart from the suppression writes, so the DSH route and the optional
+listener share it; the client key for the rate limiter is the first
+X-Forwarded-For hop (the edge) or the peer. Unsubscribe replies are found in
+the rows that a sync adds (`onNewMessages`), deduplicated through a persisted
+seen set. `lib/idle.js` keeps one IDLE connection per push account outside
+the pool; an EXISTS triggers a forced sync. Sync now issues NOOP and always
+asks `maxUid+1:*`, because a pooled connection that keeps INBOX selected has
+a stale UIDNEXT (found by the IDLE test; it also affected the background
+poll). The cache keeps an FTS5 table in step with every write. Undo send holds
+the send closure in memory (`lib/outbox.js`).

@@ -20,4 +20,5 @@ export const I = {
   fwd: s => S(s, <><path d="M9.5 4l4 4-4 4" /><path d="M13.5 8H6a3.5 3.5 0 0 0-3.5 3.5V13" /></>),
   menu: s => S(s, <path d="M2.5 4h11M2.5 8h11M2.5 12h11" />),
   search: s => S(s, <><circle cx="7" cy="7" r="4.5" /><path d="M10.5 10.5l3 3" /></>),
+  block: s => S(s, <><circle cx="8" cy="8" r="5.5" /><path d="M4.2 11.8l7.6-7.6" /></>),
 }

@@ -34,24 +34,60 @@ function useStateRoute(visible) {
   return { state, error, load }
 }
 
-function Composer({ state, init, onClose, onSent }) {
+/** Minimal rich editor: contentEditable with a small toolbar (bold, italic, link, list, quote). */
+function RichEditor({ html, onChange }) {
+  const ref = useRef(null)
+  useEffect(() => { if (ref.current && ref.current.innerHTML !== html) ref.current.innerHTML = html || '' }, [])
+  const cmd = (c, v) => { try { document.execCommand(c, false, v) } catch {} ; if (ref.current) onChange(ref.current.innerHTML) }
+  const link = () => { const u = window.prompt('Link address (https://...)'); if (u && /^(https?:|mailto:)/i.test(u)) cmd('createLink', u) }
+  return (
+    <div>
+      <div className="mlx-flex" role="toolbar" aria-label="Formatting" style={{ marginBottom: 4 }}>
+        <button type="button" className="mlx-btn" aria-label="Bold" onMouseDown={e => { e.preventDefault(); cmd('bold') }}><b>B</b></button>
+        <button type="button" className="mlx-btn" aria-label="Italic" onMouseDown={e => { e.preventDefault(); cmd('italic') }}><i>I</i></button>
+        <button type="button" className="mlx-btn" aria-label="Link" onMouseDown={e => { e.preventDefault(); link() }}>Link</button>
+        <button type="button" className="mlx-btn" aria-label="Bulleted list" onMouseDown={e => { e.preventDefault(); cmd('insertUnorderedList') }}>List</button>
+        <button type="button" className="mlx-btn" aria-label="Quote" onMouseDown={e => { e.preventDefault(); cmd('formatBlock', 'blockquote') }}>Quote</button>
+      </div>
+      <div ref={ref} className="mlx-in mlx-rich" contentEditable suppressContentEditableWarning role="textbox" aria-multiline="true" aria-label="Message"
+        style={{ minHeight: 200, overflowWrap: 'anywhere' }} onInput={e => onChange(e.currentTarget.innerHTML)} />
+    </div>
+  )
+}
+
+function Composer({ state, init, onClose, onSent, toast }) {
   const senders = (state.accounts || []).filter(a => a.enabled && a.capabilities.includes('send'))
   const defSender = senders.find(a => a.id === init.account) || senders.find(a => a.id === state.defaultAccount) || senders[0]
-  const [f, setF] = useState({ account: defSender ? defSender.id : '', to: init.to || '', cc: init.cc || '', bcc: '', subject: init.subject || '', text: init.text || '', inReplyTo: init.inReplyTo || '', references: init.references || '', threadId: init.threadId || '' })
+  const [f, setF] = useState({ account: defSender ? defSender.id : '', to: init.to || '', cc: init.cc || '', bcc: '', subject: init.subject || '', text: init.text || '', html: '', format: 'plain', inReplyTo: init.inReplyTo || '', references: init.references || '', threadId: init.threadId || '' })
   const [showCc, setShowCc] = useState(!!init.cc)
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState('')
-  const set = (k, v) => setF({ ...f, [k]: v })
+  const [draft, setDraft] = useState({ id: '', savedAt: 0 })
+  const lastSaved = useRef('')
+  const set = (k, v) => setF(x => ({ ...x, [k]: v }))
+  // Autosave every 5 s while something changed (IMAP accounts also keep the draft in Drafts).
+  useEffect(() => {
+    const t = setInterval(async () => {
+      const snap = JSON.stringify(f)
+      if (snap === lastSaved.current || !(f.text || f.html || f.subject || f.to) || !f.account) return
+      lastSaved.current = snap
+      try { const r = await apiPost('/drafts/save', { draft: { id: draft.id || undefined, account: f.account, to: f.to, cc: f.cc, bcc: f.bcc, subject: f.subject, text: f.format === 'rich' ? '' : f.text, html: f.format === 'rich' ? f.html : '', format: f.format, inReplyTo: f.inReplyTo, references: f.references } }); setDraft({ id: r.id, savedAt: r.savedAt }) } catch {}
+    }, 5000)
+    return () => clearInterval(t)
+  }, [f, draft.id])
   async function send() {
     setBusy(true); setErr('')
-    try { await apiPost('/send', f); onSent('Sent.') } catch (e) { setErr(e.message) } finally { setBusy(false) }
+    try {
+      const r = await apiPost('/send', { ...f, undo: true, draftId: draft.id || undefined })
+      onSent(r.held ? { held: true, id: r.outboxId, sendAt: r.sendAt } : 'Sent.')
+    } catch (e) { setErr(e.message) } finally { setBusy(false) }
   }
-  const dirty = f.text || f.subject || f.to
+  const dirty = f.text || f.html || f.subject || f.to
   return (
     <div className="mlx-compose" role="dialog" aria-label="Compose">
       <div className="mlx-handle" />
       <div className="mlx-hd" style={{ borderBottom: '1px solid var(--line1)' }}>
-        <button type="button" className="mlx-btn" onClick={() => { if (!dirty || window.confirm('Discard this message?')) onClose() }}>Cancel</button>
+        <button type="button" className="mlx-btn" onClick={() => { if (!dirty || window.confirm(draft.id ? 'Close? The draft is saved.' : 'Discard this message?')) onClose() }}>Cancel</button>
         <span className="t" style={{ textAlign: 'center' }}>{init.title || 'New message'}</span>
         <button type="button" className="mlx-btn p" disabled={busy || !f.account || (!f.to && !f.threadId)} onClick={() => void send()}>{busy ? 'Sending...' : 'Send'}</button>
       </div>
@@ -69,8 +105,12 @@ function Composer({ state, init, onClose, onSent }) {
           <label className="mlx-field"><span>Bcc</span><input className="mlx-in" value={f.bcc} onChange={e => set('bcc', e.target.value)} /></label>
         </div> : <button type="button" className="mlx-btn" style={{ marginBottom: 8 }} onClick={() => setShowCc(true)}>Cc / Bcc</button>}
         <label className="mlx-field"><span>Subject</span><input className="mlx-in" value={f.subject} onChange={e => set('subject', e.target.value)} /></label>
-        <textarea className="mlx-in" rows={12} value={f.text} onChange={e => set('text', e.target.value)} aria-label="Message" autoFocus />
-        <div className="mlx-s" style={{ marginTop: 6 }}>The account signature is added when sending.</div>
+        <div className="mlx-chips" style={{ padding: '0 0 6px' }} role="radiogroup" aria-label="Format">
+          {[['plain', 'Plain'], ['markdown', 'Markdown'], ['rich', 'Rich text']].map(([k, l]) => <button key={k} type="button" className="mlx-fchip" aria-pressed={f.format === k} onClick={() => set('format', k)}>{l}</button>)}
+        </div>
+        {f.format === 'rich' ? <RichEditor html={f.html || (f.text ? f.text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/\n/g, '<br>') : '')} onChange={v => set('html', v)} />
+          : <textarea className="mlx-in" rows={12} value={f.text} onChange={e => set('text', e.target.value)} aria-label="Message" autoFocus placeholder={f.format === 'markdown' ? '**bold**, _italic_, [link](https://...), - lists, > quotes' : ''} />}
+        <div className="mlx-s" style={{ marginTop: 6 }}>{draft.savedAt ? 'Draft saved ' + new Date(draft.savedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) + '. ' : ''}The account signature is added when sending.</div>
       </div>
     </div>
   )
@@ -88,6 +128,42 @@ function AuditList() {
       ))}
       {rows && !rows.length ? <div className="mlx-s">Nothing yet.</div> : null}
     </details>
+  )
+}
+
+function SuppressionPane({ toast }) {
+  const [data, setData] = useState(null)
+  const [camps, setCamps] = useState([])
+  const [q, setQ] = useState('')
+  const [add, setAdd] = useState('')
+  const [err, setErr] = useState('')
+  const load = () => { apiGet('/suppress').then(setData).catch(e => setErr(e.message)); apiGet('/campaigns').then(r => setCamps(r.campaigns)).catch(() => {}) }
+  useEffect(() => { load() }, [])
+  const post = async (body, msg) => { setErr(''); try { await apiPost('/suppress', body); toast(msg); load() } catch (e) { setErr(e.message) } }
+  const rows = data ? [...data.global.map(e => ({ address: e.address, scope: '', reason: e.reason })), ...Object.entries(data.lists).flatMap(([l, m]) => Object.entries(m).map(([a, v]) => ({ address: a, scope: l, reason: v.reason })))] : []
+  const shown = rows.filter(r => !q || r.address.includes(q.toLowerCase()) || r.scope.includes(q.toLowerCase()))
+  return (
+    <div className="mlx-body">
+      <div className="mlx-ftitle"><h2>Unsubscribes</h2><span className="mlx-pill">{rows.length}</span><a className="mlx-btn" href={API + '/suppress?format=csv'} download="dsh-mail-suppression.csv">Export CSV</a></div>
+      <div className="mlx-s" style={{ padding: '0 12px 6px' }}>Mass sends skip these addresses. "All mail" blocks every mass send; a list entry blocks only that list. Unsubscribe links, one-click unsubscribes, unsubscribe replies and hard bounces land here.</div>
+      <div className="mlx-search"><input type="search" className="mlx-in" placeholder="Search address or list" value={q} onChange={e => setQ(e.target.value)} aria-label="Search unsubscribes" /></div>
+      <div className="mlx-search"><input className="mlx-in" placeholder="Add name@example.com or @example.com" value={add} onChange={e => setAdd(e.target.value)} aria-label="Address to block" /><button type="button" className="mlx-btn" disabled={!add} onClick={() => { void post({ add }, 'Added.'); setAdd('') }}>Block</button></div>
+      {err ? <div className="mlx-note bad">{err}</div> : null}
+      {!data ? <div className="mlx-skel" /> : !shown.length ? <div className="mlx-empty">{q ? 'No match.' : 'Nobody has unsubscribed yet.'}</div> : (
+        <ul className="mlx-list" role="list">
+          {shown.slice(0, 500).map(r => (
+            <li key={r.scope + r.address} className="mlx-li" style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 12px' }}>
+              <span style={{ flex: 1, minWidth: 0 }}><span className="mlx-mono" style={{ overflowWrap: 'anywhere' }}>{r.address}</span><div className="mlx-s">{r.scope ? 'list ' + r.scope : 'all mail'}{r.reason ? ' · ' + r.reason : ''}</div></span>
+              <button type="button" className="mlx-btn d" aria-label={'Remove ' + r.address} onClick={() => { if (window.confirm('Remove ' + r.address + ' from ' + (r.scope ? 'the list ' + r.scope : 'the global list') + '? Mass sends will reach this address again.')) void post({ remove: r.address, list: r.scope || undefined }, 'Removed.') }}>Remove</button>
+            </li>
+          ))}
+        </ul>
+      )}
+      {camps.length ? <>
+        <div className="mlx-h">Campaigns</div>
+        {camps.slice(0, 30).map(c => <div key={c.id} className="mlx-qrow"><div className="mlx-flex"><b style={{ flex: 1 }}>{c.list}</b><span className="mlx-s">{fullTime(c.createdAt)}</span></div><div className="mlx-s">{c.account} · {c.sent} sent · {c.unsubscribed} unsubscribed · <span className="mlx-mono">{c.id}</span></div></div>)}
+      </> : null}
+    </div>
   )
 }
 
@@ -142,10 +218,9 @@ function FoldersPane({ state, sel, choose }) {
   const readers = (state.accounts || []).filter(a => a.enabled && a.receive !== 'none')
   const [folders, setFolders] = useState({})
   const [more, setMore] = useState({})
+  const reloadFolders = id => apiGet('/folders', { account: id }).then(r => setFolders(f => ({ ...f, [id]: r.folders }))).catch(e => setFolders(f => ({ ...f, [id]: { error: e.message } })))
   useEffect(() => {
-    let alive = true
-    for (const a of readers) apiGet('/folders', { account: a.id }).then(r => { if (alive) setFolders(f => ({ ...f, [a.id]: r.folders })) }).catch(e => { if (alive) setFolders(f => ({ ...f, [a.id]: { error: e.message } })) })
-    return () => { alive = false }
+    for (const a of readers) void reloadFolders(a.id)
   }, [readers.map(a => a.id).join(',')])
   const totalUnread = readers.reduce((n, a) => n + (a.unread || 0), 0)
   return (
@@ -169,12 +244,18 @@ function FoldersPane({ state, sel, choose }) {
                 <span className="nm">{ROLE_LABEL[x.role]}</span>{x.unseen ? <span className="mlx-pill">{x.unseen}</span> : null}
               </button>
             ))}
+            {a.receive === 'imap' ? <div className="mlx-flex" style={{ padding: '2px 14px' }}>
+              <button type="button" className="mlx-btn" onClick={async () => { const n = window.prompt('New folder name'); if (!n) return; try { await apiPost('/folders/create', { account: a.id, name: n }); reloadFolders(a.id) } catch (e) { window.alert(e.message) } }}>New folder</button>
+            </div> : null}
             {custom.length ? <>
               <button type="button" className="mlx-fold" onClick={() => setMore({ ...more, [a.id]: !more[a.id] })} aria-expanded={!!more[a.id]}>{I.folder(15)}<span className="nm">More</span><span className="mlx-s">{custom.length}</span></button>
               {more[a.id] ? custom.map(x => (
-                <button key={x.path} type="button" className="mlx-fold" style={{ paddingLeft: 30 }} aria-current={sel.account === a.id && sel.folder === x.path} onClick={() => choose({ account: a.id, folder: x.path, title: x.name })}>
-                  <span className="nm">{x.path}</span>{x.unseen ? <span className="mlx-pill">{x.unseen}</span> : null}
-                </button>
+                <div key={x.path} className="mlx-flex" style={{ gap: 0 }}>
+                  <button type="button" className="mlx-fold" style={{ paddingLeft: 30, flex: 1, minWidth: 0 }} aria-current={sel.account === a.id && sel.folder === x.path} onClick={() => choose({ account: a.id, folder: x.path, title: x.name })}>
+                    <span className="nm">{x.path}</span>{x.unseen ? <span className="mlx-pill">{x.unseen}</span> : null}
+                  </button>
+                  {a.receive === 'imap' ? <button type="button" className="mlx-ib" aria-label={'Rename ' + x.path} onClick={async () => { const n = window.prompt('Rename folder', x.path); if (!n || n === x.path) return; try { await apiPost('/folders/rename', { account: a.id, from: x.path, to: n }); reloadFolders(a.id) } catch (er) { window.alert(er.message) } }}>{I.pen(13)}</button> : null}
+                </div>
               )) : null}
             </> : null}
           </div>
@@ -203,6 +284,7 @@ export function MailView({ visible }) {
   const [selected, setSelected] = useState(new Set())
   const [compose, setCompose] = useState(null)
   const [toastMsg, setToastMsg] = useState('')
+  const [undo, setUndo] = useState(null)
   const rootRef = useRef(null)
   const toast = m => { setToastMsg(m); setTimeout(() => setToastMsg(''), 4000) }
 
@@ -321,6 +403,7 @@ export function MailView({ visible }) {
         <span className="t" />
         <button type="button" className="mlx-ib" aria-label="Refresh" title="Refresh" onClick={() => { void apiPost('/sync', unified ? {} : { account: sel.account, folder: sel.folder || undefined }).catch(() => {}).then(() => fetchList()); void load() }}>{I.refresh(15)}</button>
         <button type="button" className="mlx-ib" aria-label={'Queue, ' + pendingCount + ' pending'} aria-pressed={pane === 'queue'} title="Review queue" onClick={() => setPane(pane === 'queue' ? 'list' : 'queue')}>{I.queue(15)}{pendingCount ? <span className="mlx-badge">{pendingCount}</span> : null}</button>
+        <button type="button" className="mlx-ib" aria-label="Unsubscribes" aria-pressed={pane === 'suppress'} title="Unsubscribes and suppression" onClick={() => setPane(pane === 'suppress' ? 'list' : 'suppress')}>{I.block(15)}</button>
         <button type="button" className="mlx-ib" aria-label="Settings" aria-pressed={pane === 'settings'} title="Accounts and settings" onClick={() => setPane(pane === 'settings' ? 'list' : 'settings')}>{I.gear(15)}</button>
       </div>
 
@@ -388,13 +471,20 @@ export function MailView({ visible }) {
         onAct={a => { void act([open], a); if (a === 'archive' || a === 'trash') { setPane('list'); setOpen(null) } }} /> : null}
       {pane === 'folders' && state ? <FoldersPane state={state} sel={sel} choose={choose} /> : null}
       {pane === 'queue' && state ? <QueuePane state={state} reload={load} toast={toast} /> : null}
+      {pane === 'suppress' ? <SuppressionPane toast={toast} /> : null}
       {pane === 'settings' ? <div className="mlx-body mlx-pad">
         <AccountsEditor onChanged={() => { void load(); void fetchList() }} />
         {state ? <div className="mlx-s" style={{ marginTop: 8 }}>dsh-mail {state.version} · cache {state.cacheKind || 'not opened yet'} · agent sends: {state.confirmMode.mode}</div> : null}
       </div> : null}
 
-      {compose && state ? <Composer state={state} init={compose} onClose={() => setCompose(null)} onSent={m => { setCompose(null); toast(m); void load() }} /> : null}
-      {toastMsg ? <div className="mlx-toast" role="status">{toastMsg}</div> : null}
+      {compose && state ? <Composer state={state} init={compose} onClose={() => setCompose(null)} onSent={m => {
+        setCompose(null)
+        if (m && m.held) { setUndo(m); setTimeout(() => setUndo(u => (u && u.id === m.id ? null : u)), Math.max(1000, m.sendAt - Date.now())) }
+        else toast(m)
+        void load()
+      }} /> : null}
+      {undo ? <div className="mlx-toast" role="status">Sending... <button type="button" className="mlx-btn" style={{ marginLeft: 8, color: 'inherit' }} onClick={async () => { const id = undo.id; setUndo(null); try { await apiPost('/outbox/cancel', { id }); toast('Not sent.') } catch { toast('Too late: already sent.') } }}>Undo</button></div> : null}
+      {toastMsg && !undo ? <div className="mlx-toast" role="status">{toastMsg}</div> : null}
     </div>
   )
 }

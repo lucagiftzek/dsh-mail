@@ -173,6 +173,8 @@ await import('./e2e.test.mjs')
 await import('./oauth.test.mjs')
 await import('./dual.test.mjs')
 await import('./phase3.test.mjs')
+await import('./phase4.test.mjs')
+await import('./render.test.mjs')
 
 rmSync(TMP, { recursive: true, force: true })
 console.log('\n' + stats.passed + ' passed, ' + stats.failed + ' failed' + (stats.failed ? ': ' + stats.failures.join('; ') : ''))

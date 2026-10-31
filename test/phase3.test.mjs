@@ -198,7 +198,8 @@ await test('mass send of 120 rows: unsubscribe headers, suppression honoured, al
   await mutate(p.port, '/suppress', { add: 'u7@example.org' })
   await mutate(p.port, '/suppress', { add: '@blocked.example' })
   const csv = 'name,email\n' + rows(118).map(r => r.name + ',' + r.email).join('\n') + '\nX,x@blocked.example\nY,y@blocked.example'
-  const refused = await T('mail_mass_send').execute({ account: 'box', subjectTemplate: 'Hi {name}', textTemplate: 'Hello {name}', csv, delayMs: 0 })
+  // 'slow' cannot receive mail and no public unsubscribe URL is configured: no built-in unsubscribe, so refused
+  const refused = await T('mail_mass_send').execute({ account: 'slow', subjectTemplate: 'Hi {name}', textTemplate: 'Hello {name}', csv, delayMs: 0 })
   assert.equal(refused.ok, false); assert.match(refused.error, /unsubscribe/)
   const r = await T('mail_mass_send').execute({ account: 'box', subjectTemplate: 'Hi {name}', textTemplate: 'Hello {name}', csv, delayMs: 0, unsubscribe: 'mailto:unsub@example.org, https://example.org/u?e={email}' })
   assert.equal(r.ok, true, r.error); assert.equal(r.total, 120); assert.equal(r.sent, 117); assert.equal(r.suppressed, 3)

@@ -298,6 +298,10 @@ function AccountForm({ initial, isNew, types, presets, onDone, onCancel }) {
         <Check checked={a.agent.canMass} onChange={v => set('agent.canMass', v)}>mass send</Check>
         <Check checked={a.agent.default} onChange={v => set('agent.default', v)}>default account</Check>
       </div> : null}
+      {mailProto && !oauth || t === 'imap-smtp' || t === 'local' || t === 'google' || t === 'microsoft' ? <div className="mlx-grid">
+        <Field label="Unsubscribe mailbox" hint="Replies here are processed. Empty: your address with +unsubscribe"><input className="mlx-in mlx-mono" value={(a.unsubscribe && a.unsubscribe.mailto) || ''} onChange={e => set('unsubscribe.mailto', e.target.value.trim())} /></Field>
+        {a.receive && a.receive.protocol === 'imap' ? <Field label="New mail"><Check checked={!!a.push} onChange={v => set('push', v)}>Instant (IMAP IDLE)</Check></Field> : null}
+      </div> : null}
       <div className="mlx-flex">
         <Check checked={a.enabled} onChange={v => set('enabled', v)}>Enabled</Check>
         <Check checked={a.isDefaultSender} onChange={v => set('isDefaultSender', v)}>Default sender in the composer</Check>
@@ -324,7 +328,43 @@ function AccountForm({ initial, isNew, types, presets, onDone, onCancel }) {
 
 const ADD_ORDER = ['imap-smtp', 'pop3-smtp', 'google', 'microsoft', 'tzekos', 'lettermint', 'resend', 'sendgrid', 'agentmail', 'local']
 
-function SuppressionList() {
+function UnsubscribeSettings() {
+  const [u, setU] = useState(null)
+  const [st, setSt] = useState(null)
+  const [msg, setMsg] = useState('')
+  useEffect(() => {
+    apiGet('/accounts').then(r => setU(r.settings.unsubscribe || {})).catch(() => {})
+    apiGet('/unsubscribe/status').then(setSt).catch(() => {})
+  }, [])
+  if (!u) return null
+  const set = (k, v) => setU({ ...u, [k]: v })
+  const save = async () => {
+    setMsg('')
+    try { await apiPost('/settings', { settings: { unsubscribe: { publicBaseUrl: u.publicBaseUrl || '', mailto: u.mailto || '', language: u.language || 'en', footer: u.footer !== false, listenPort: Number(u.listenPort) || 0, texts: u.texts || {} } } }); setMsg('Saved.') } catch (e) { setMsg(e.message) }
+  }
+  return (
+    <div className="mlx-acc">
+      <b>Unsubscribe</b>
+      <div className="mlx-s" style={{ margin: '4px 0' }}>Every mass mail gets a personal unsubscribe link and address (List-Unsubscribe, one-click when a public address is set) and a footer. Unsubscribe replies to the addresses below are processed when mail is synced. The list of unsubscribed addresses is in the Mail tab (no-entry icon).</div>
+      <div className="mlx-grid">
+        <Field label="Public base URL for one-click links" hint="https://host; the edge must route /dsh-mail-unsub/* to the unsubscribe listener without login"><input className="mlx-in mlx-mono" value={u.publicBaseUrl || ''} onChange={e => set('publicBaseUrl', e.target.value.trim())} placeholder="https://mail-unsub.example.org" /></Field>
+        <Field label="Unsubscribe mailbox" hint="Used when an account has none; must be read by one of the accounts"><input className="mlx-in mlx-mono" value={u.mailto || ''} onChange={e => set('mailto', e.target.value.trim())} placeholder="unsubscribe@example.org" /></Field>
+        <Field label="Listener port" hint="0 = off; restart needed"><input className="mlx-in" type="number" value={u.listenPort || 0} onChange={e => set('listenPort', Number(e.target.value))} /></Field>
+        <Field label="Footer language">
+          <select className="mlx-in" value={u.language || 'en'} onChange={e => set('language', e.target.value)}><option value="en">English</option><option value="it">Italiano</option><option value="el">Ελληνικά</option></select>
+        </Field>
+      </div>
+      <Check checked={u.footer !== false} onChange={v => set('footer', v)}>Add the unsubscribe footer to mass mails</Check>
+      <details><summary className="mlx-s" style={{ cursor: 'pointer' }}>Custom footer texts ({'{sender}'} {'{url}'} {'{mailto}'})</summary>
+        {['en', 'it', 'el'].map(l => <Field key={l} label={l}><textarea className="mlx-in" rows={2} value={(u.texts && u.texts[l]) || ''} onChange={e => set('texts', { ...(u.texts || {}), [l]: e.target.value })} /></Field>)}
+      </details>
+      {st ? <div className="mlx-s" style={{ marginTop: 4 }}>Processed mailboxes: {st.mailto.length ? st.mailto.join(', ') : 'none'}. Listener: {st.listener ? st.listener.host + ':' + st.listener.port : 'off'}.</div> : null}
+      <div className="mlx-flex" style={{ marginTop: 6 }}><button type="button" className="mlx-btn" onClick={() => void save()}>Save</button>{msg ? <span className="mlx-s">{msg}</span> : null}</div>
+    </div>
+  )
+}
+
+export function SuppressionList() {
   const [list, setList] = useState(null)
   const [add, setAdd] = useState('')
   const [err, setErr] = useState('')
@@ -453,7 +493,7 @@ export function AccountsEditor({ onChanged }) {
           </div>
           <button type="button" className="mlx-btn" onClick={() => void saveGlobal()}>Save</button>
         </div> : null}
-        <SuppressionList />
+        <UnsubscribeSettings />
       </>}
     </div>
   )

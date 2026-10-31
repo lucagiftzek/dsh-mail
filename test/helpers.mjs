@@ -15,11 +15,11 @@ export async function bootPlugin({ dir, settings = {}, withDshSettings = null, e
   if (!noSettingsFile) writeFileSync(join(process.env.DSH_MAIL_DATA_DIR, 'settings.json'), JSON.stringify(settings))
   const { apply } = await import('../lib/index.js')
   const tools = new Map()
-  let route = null
+  const routes = []
   const disposers = []
   const base = {
     tools: { register: t => tools.set(t.name, t) },
-    webServer: { register: r => { route = r; return () => {} } },
+    webServer: { register: r => { routes.push(r); return () => {} } },
     effect: (fn) => { const d = fn(); if (typeof d === 'function') disposers.push(d) },
     ...extra,
   }
@@ -27,7 +27,12 @@ export async function bootPlugin({ dir, settings = {}, withDshSettings = null, e
   // strict: like cordis on DSH 0.2, reading a service that is not injected throws
   const ctx = strict ? new Proxy(base, { get(t, k) { if (typeof k === 'symbol' || k in t) return t[k]; throw new TypeError('cannot get property "' + String(k) + '" without inject') } }) : base
   const api = apply(ctx, config)
-  const server = http.createServer((req, res) => route.handler(req, res))
+  const server = http.createServer((req, res) => {
+    const path = new URL(req.url, 'http://x').pathname
+    const r = routes.filter(x => path === x.path || path.startsWith(x.path + '/')).sort((a, b) => b.path.length - a.path.length)[0]
+    if (!r) { res.writeHead(404); res.end(); return }
+    r.handler(req, res)
+  })
   await new Promise(r => server.listen(0, '127.0.0.1', r))
   const port = server.address().port
   // wait for the capability secret
@@ -43,10 +48,10 @@ export function cookieFor(host) {
   return 'dsh-auth-' + d + '=1'
 }
 
-export function request(port, method, path, { body, headers = {} } = {}) {
+export function request(port, method, path, { body, headers = {}, raw = false } = {}) {
   return new Promise((resolve, reject) => {
     const data = body === undefined ? null : Buffer.from(typeof body === 'string' ? body : JSON.stringify(body))
-    const req = http.request({ host: '127.0.0.1', port, method, path: '/dsh-mail/api' + path, headers: { ...(data ? { 'content-type': 'application/json', 'content-length': data.length } : {}), ...headers } }, res => {
+    const req = http.request({ host: '127.0.0.1', port, method, path: raw ? path : '/dsh-mail/api' + path, headers: { ...(data ? { 'content-type': 'application/json', 'content-length': data.length } : {}), ...headers } }, res => {
       const chunks = []
       res.on('data', c => chunks.push(c))
       res.on('end', () => {

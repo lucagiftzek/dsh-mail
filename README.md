@@ -11,7 +11,7 @@ Everything runs on your DSH host: mail is fetched straight from your own
 servers into a local cache, nothing is sent anywhere else, and there is no
 telemetry.
 
-## What is in version 0.2 (phases 1 to 3 of v2)
+## What is in version 0.2 (phases 1 to 4 of v2)
 
 - **Accounts** in DSH Settings: a "Mail" settings section (and the gear in the
   tab) to add, edit, test and remove accounts. Several accounts at once.
@@ -46,8 +46,13 @@ telemetry.
   local audit log, `mail_forward`, and an explicit "Convert legacy settings to
   accounts" button. Settings work on DSH 0.1 and DSH 0.2.
 
-Coming next (phase 4): IMAP IDLE push, full-text search, rich compose and
-undo send.
+- **Unsubscribe and polish** (phase 4): built-in unsubscribe for mass mail
+  (signed per-recipient links, List-Unsubscribe mailto and RFC 8058
+  one-click, a footer in English, Italian or Greek, automatic processing of
+  link clicks and unsubscribe replies, per-list and global suppression,
+  campaigns, an Unsubscribes pane and `mail_suppression`), IMAP IDLE push,
+  FTS5 full-text search, Markdown and rich text compose, 6 s undo send,
+  drafts kept in the IMAP Drafts folder, folder create and rename.
 
 ## Accounts
 
@@ -191,14 +196,14 @@ cache; it never triggers agent actions.
 
 ### Mass sending and agent guard rails
 
-- More than 50 recipients (`mass.unsubscribeAbove`) need an unsubscribe
-  address: `unsubscribe: "mailto:...", "https://...?e={email}"` adds
-  `List-Unsubscribe`, plus `List-Unsubscribe-Post: List-Unsubscribe=One-Click`
-  for https; every mass message carries `Precedence: bulk`. Accounts that
-  cannot set headers (Tzekos Mail, AgentMail) refuse such batches.
-- The suppression list `~/.dsh/mail/suppress.txt` (an address or `@domain`
-  per line; also in the settings) is skipped by mass sends and fed by hard
-  bounces (5.1.x).
+- More than 50 recipients (`mass.unsubscribeAbove`, every account) need an
+  unsubscribe: the built-in one (below) or a custom `unsubscribe: "mailto:...",
+  "https://...?e={email}"`. Every mass message carries `Precedence: bulk`.
+  Accounts that cannot set headers (Tzekos Mail, AgentMail) refuse such
+  batches.
+- Suppression: the global list `~/.dsh/mail/suppress.txt` (an address or
+  `@domain` per line) and per-list entries in `suppress-lists.json` are
+  skipped by mass sends; hard bounces (5.1.x) go to the global list.
 - Per-account limits `perMinute` / `perDay` (0 = no limit); a send over the
   limit returns `rate limit: ...` with `retryAfterSec`. Mass sends wait for
   the next minute and stop at the daily limit. Delays get a random +-20 %
@@ -213,6 +218,73 @@ cache; it never triggers agent actions.
   timer, webhook), account, action, recipient count and a hash of the subject;
   never bodies. Shown under "Recent activity" in the Queue pane and at
   `GET /audit`.
+
+### Unsubscribe
+
+Each mass send is a **campaign** (`mail_mass_send` returns its `campaignId`)
+on a **list** (`list: "newsletter"`; default: the campaign itself). Every
+recipient gets a personal token: an HMAC signature (key derived from the
+plugin's 0600 capability secret) over the account, list, campaign and a hash
+of the address. The token never contains the address; the campaign record
+on this host (0600) maps the hash back. Messages carry:
+
+- `List-Unsubscribe: <mailto:ADDR?subject=unsubscribe%20TOKEN>, <https://BASE/dsh-mail-unsub/TOKEN>`
+  and, with the https link, `List-Unsubscribe-Post: List-Unsubscribe=One-Click`
+  (RFC 8058, one-click from Gmail, Yahoo and Apple Mail).
+- A visible footer (English, Italian or Greek, per send with `language`, or
+  your own text per language with `{sender}` `{url}` `{mailto}`).
+
+ADDR is the account's unsubscribe mailbox, the global `unsubscribe.mailto`,
+or `<your address>+unsubscribe@<domain>` for accounts that read their mail.
+When mail syncs, messages to that address (or with "unsubscribe TOKEN" in the
+subject) are processed: a valid token unsubscribes that recipient from its
+list; otherwise the sender is suppressed for all mail. Each message counts
+once, so removing an address is not undone by the next sync.
+
+The https link needs `unsubscribe.publicBaseUrl` (https only) and a public
+path to the plugin. The page at `/dsh-mail-unsub/<token>` answers GET with a
+confirm page (address masked, "this list" or "all mail") and POST (the form or
+the one-click POST) with 200. It verifies the HMAC, is rate limited (20 per
+minute per client, 600 in total), sends no referrer, a strict CSP and noindex.
+It is served by DSH and, with `unsubscribe.listenPort`, by a small separate
+listener (default 127.0.0.1) that serves nothing else. **The edge route is
+not created by the plugin.** Expose only that path without login, for example
+with Caddy:
+
+```
+unsub.example.org {
+  @unsub path /dsh-mail-unsub/*
+  handle @unsub { reverse_proxy 127.0.0.1:<listenPort> }
+  handle { respond 404 }
+}
+```
+
+(behind a Cloudflare tunnel: an ingress rule for that hostname and path to
+the same port). Keep the login on everything else.
+
+The Unsubscribes pane (no-entry icon in the Mail tab) lists, searches,
+removes (after a confirmation) and exports (CSV) the entries and shows the
+campaigns with their sent and unsubscribed counts. Agents use
+`mail_suppression` (`list`, `check`, `campaigns`; `add` and `remove` only
+apply with `confirm: true`).
+
+### Reading and writing
+
+- **Instant new mail:** tick "Instant (IMAP IDLE)" on an IMAP account (at
+  most `push.maxAccounts`, default 5). One extra connection waits for new
+  mail; a drop reconnects with backoff, and after 3 failures, or on a server
+  without IDLE, the account stays on polling.
+- **Search** uses an SQLite FTS5 index over subject, sender, recipients and
+  cached text (word prefixes, accents ignored); `from:` `subject:` and the
+  other operators still apply.
+- **Compose** in plain text, Markdown or rich text. HTML is sanitised and sent
+  together with a text part. Drafts save every 5 s and, for IMAP accounts, are
+  kept in the Drafts folder (the previous copy is replaced).
+- **Undo send:** messages sent from the tab wait `compose.undoSendSec`
+  seconds (default 6, 0 = off) with an Undo button. A restart in that window
+  drops the message.
+- **Folders:** create custom folders and rename them (special folders keep
+  their names). Agents need `canManageFolders` on the account.
 
 ### Upgrading from v0.1
 
@@ -262,8 +334,9 @@ injected), the plugin reads the row config, the old section and
 
 | Tool | What it does |
 |---|---|
-| `mail_send` | send one message (`account`/`provider`, `to`, `cc`, `bcc`, `subject`, `text`, `html`, `replyTo`, `attachments`, `draftId`, `confirm`) |
-| `mail_mass_send` | CSV-personalised bulk send (`unsubscribe`, `dryRun`, `delayMs`); staged for review under draft-first |
+| `mail_send` | send one message (`account`/`provider`, `to`, `cc`, `bcc`, `subject`, `text`, `format: markdown`, `html`, `replyTo`, `attachments`, `draftId`, `confirm`) |
+| `mail_mass_send` | CSV-personalised bulk send (`list`, `language`, `footer`, `unsubscribe`, `dryRun`, `delayMs`; returns `campaignId`); staged for review under draft-first |
+| `mail_suppression` | unsubscribes and suppression: `list`, `check`, `campaigns`, `add` / `remove` with `confirm: true` |
 | `mail_forward` | forward a message with a note (`id`, `to`, `note`, `attachments: true` to include the originals); draft first |
 | `mail_send_later` | schedule a send (`sendAt`) or queue it for manual send |
 | `mail_read` | recent messages of any account that can read (`folder`, `unread`, `since`, `domain`, `address`) |
@@ -273,7 +346,7 @@ injected), the plugin reads the row config, the old section and
 | `mail_inbox`, `mail_thread`, `mail_reply`, `mail_triage` | conversations (Tzekos Mail, or IMAP / POP3 via the cache with `account`) |
 | `mail_contacts`, `mail_remind` | Tzekos Mail address book and reminders |
 | `mail_accounts` | accounts visible to agents, capabilities, confirm mode, default account |
-| `mail_folders` | folders with unread and total counts |
+| `mail_folders` | folders with unread and total counts; `create` and `rename` with the account permission `canManageFolders` |
 | `mail_search` | search the cache and the IMAP server |
 | `mail_mark` | read, unread, flag, unflag |
 | `mail_move` | inbox, archive, trash, spam or a folder path (never deletes permanently) |
@@ -323,9 +396,10 @@ it off.
 ## Dependencies
 
 Runtime: `imapflow` (MIT), `nodemailer` (MIT-0), `mailparser` (MIT),
-`sanitize-html` (MIT), `yaml` (ISC). Tests and build: `esbuild` (MIT),
-`hoodiecrow-imap` (MIT, in-memory IMAP + SMTP test server), `smtp-server`
-(MIT-0). The POP3 client is a small built-in module (`lib/pop3.js`).
+`sanitize-html` (MIT), `marked` (MIT), `html-to-text` (MIT), `yaml` (ISC).
+Tests and build: `esbuild` (MIT), `hoodiecrow-imap` (MIT, in-memory IMAP +
+SMTP test server), `smtp-server` (MIT-0), `happy-dom` (MIT), `react` and
+`react-dom` (MIT, for the 360 px render test). The POP3 client is a small built-in module (`lib/pop3.js`).
 
 ## Layout
 
@@ -351,6 +425,10 @@ lib/outbound.js        audit log, suppression, rate limits, mass send
 lib/presets.json       server presets (scripts/probe-presets.mjs checks them)
 lib/inbound.js         SendGrid Inbound Parse webhook
 lib/convert.js         "Convert legacy settings to accounts"
+lib/unsub.js           unsubscribe tokens, campaigns, public page, reply processing
+lib/compose.js         Markdown and rich text bodies
+lib/idle.js            IMAP IDLE push
+lib/outbox.js          undo send
 lib/staging.js         review queue, CSV
 lib/providers.js       API providers (Lettermint, Resend, AgentMail, v0.1 transports)
 lib/mailbox.js         Tzekos Mail agent API client

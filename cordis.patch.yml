@@ -6,8 +6,8 @@
 # the "Mail" tab on dsh-better-sidebar's public ctx.betterSidebar.registerTab
 # extension point.
 #
-# Install (this estate, after human sign-off):
-#   1. add  "dsh-mail": "link:/opt/stacks/llm/plugins/dsh-mail"
+# Install (after human sign-off):
+#   1. add  "dsh-mail": "link:/path/to/dsh-mail"
 #      to ~/.dsh/profiles/web/package.json dependencies
 #   2. append  dsh-mail  to dsh.profile.bundles
 #   3. pnpm install  in ~/.dsh/profiles/web

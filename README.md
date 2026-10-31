@@ -60,21 +60,12 @@ inside dsh-web).
 ## Settings
 
 Settings live in `~/.dsh/settings.yaml` under the `dsh-mail` namespace.
-Credentials are auto-populated from estate files on first use:
+Credentials are auto-populated from local credential files on first use:
 - Lettermint: `~/.config/lettermint/credentials` (`LETTERMINT_API_KEY`)
 - AgentMail: `~/.config/agentmail/credentials` (`AGENTMAIL_API_KEY`, `AGENTMAIL_TEST_INBOX`)
 
 Credentials are **never** hard-coded in the repo. They are read at call time
 and merged with settings (settings win only when non-empty).
-
-> Credential provenance on this estate (2026-09-19): the populated
-> `LETTERMINT_API_KEY` lives in `~/.config/erioun-prod/credentials` on Main
-> (the Erioun prod service's key — same `x-lettermint-token` auth the plugin
-> uses). It was filled into the empty `LETTERMINT_API_KEY=` line of the local
-> `~/.config/lettermint/credentials` on BlackServer so dsh-mail's estate
-> discovery picks it up. Verified live: POST /v1/send with an empty payload
-> returns 422 (auth accepted, validation rejects), never 401. No key value is
-> stored in this repo, in settings.yaml, or in any artifact.
 
 ## Kill switch
 
@@ -93,3 +84,7 @@ scripts/build.mjs esbuild bundler
 ```
 
 See [docs/DESIGN.md](docs/DESIGN.md) for the full architecture.
+
+---
+
+Built by Luca Tzekos, who also makes [**Job Opportunities API**](https://jobopportunitiesapi.org): employer-direct job data with per-field provenance you can verify yourself, free to read and available as an API. If this plugin is useful to you, a star on this repo or a look at [jobopportunitiesapi.org](https://jobopportunitiesapi.org) is the best thanks.

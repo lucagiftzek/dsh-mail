@@ -17,7 +17,7 @@ The main entry point. `apply(ctx)` receives the DSH context and:
 2. **Defines agent tools** via `ctx.tools.register(defineTool({...}))` — 8 tools
 3. **Registers HTTP routes** at `/dsh-mail/api/*` via `ctx.webServer.register`
 4. **Runs a tick timer** every `tickSeconds` to process scheduled queue entries
-5. **Resolves credentials** at call-time from settings + estate files
+5. **Resolves credentials** at call-time from settings + local credential files
 
 ### providers.js
 
@@ -98,6 +98,3 @@ Timer tick (every 30s)
 - Credential sources (read-only, merged at call time, settings win only when
   non-empty): `~/.config/lettermint/credentials` → `lettermintApiKey`,
   `~/.config/agentmail/credentials` → `agentmailApiKey` / `agentmailInbox`.
-  On this estate the populated Lettermint key originates from
-  `~/.config/erioun-prod/credentials` on Main (Erioun prod) and was copied
-  into the local lettermint credentials file; see README "Settings".

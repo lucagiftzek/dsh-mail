@@ -190,7 +190,7 @@ await test('complete: wrong PKCE verifier is refused by the provider; correct on
   assert.equal(ok.json.ok, true, ok.text); assert.equal(ok.json.account, 'gm')
   noCanary('/oauth/complete', ok.text)
   const replay = await mutate(p.port, '/oauth/complete', { code: 'code-1', state: again.searchParams.get('state') })
-  assert.equal(replay.json.ok, false); assert.equal(replay.json.code, 'replayed_state')
+  assert.equal(replay.json.ok, false); assert.equal(replay.json.oauthCode, 'replayed_state'); assert.equal(replay.json.code, 'MAIL_OAUTH_FLOW_FAILED')
   const enc = join(dir, 'data', 'tokens.enc')
   assert.equal(statSync(enc).mode & 0o777, 0o600)
   const raw = readFileSync(enc, 'utf8')

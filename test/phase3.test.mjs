@@ -6,7 +6,7 @@
  */
 import { strict as assert } from 'node:assert'
 import { createRequire } from 'node:module'
-import { mkdtempSync, rmSync, readFileSync, statSync, existsSync, mkdirSync, writeFileSync } from 'node:fs'
+import { mkdtempSync, rmSync, readFileSync, statSync, existsSync, mkdirSync, writeFileSync, readdirSync } from 'node:fs'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 import http from 'node:http'
@@ -281,7 +281,14 @@ section('phase 3: convert legacy settings to accounts')
     assert.equal(c.resolved().explicit.length, 0)
   })
   await test('convert: same ids, behaviour pinned, secrets moved to the 0600 file, file keys referenced, backup written', async () => {
+    // a DSH 0.2 profile row exists: it must be backed up too
+    mkdirSync(join(d2, 'home', 'profiles', 'web'), { recursive: true })
+    writeFileSync(join(d2, 'home', 'profiles', 'web', 'cordis.patch.yml'), '- id: dsh-mail\n')
     const r = await mutate(c.port, '/accounts/convert', { confirm: true })
+    assert.ok(r.json.backups.some(b => /^cordis\.patch\.yml\.bak-\d{8}-mailv2-convert/.test(b)), 'profile row backed up')
+    const bdir = join(d2, 'data', 'backups')
+    const bjson = readFileSync(join(bdir, readdirSync(bdir).find(n => n.endsWith('.json'))), 'utf8')
+    for (const s of ['re-conv-canary', 'tz-conv-canary', 'smtp-conv-canary']) assert.ok(!bjson.includes(s), 'the JSON backup holds no secret value')
     assert.equal(r.status, 200, r.text)
     assert.deepEqual(r.json.converted.sort(), ['lettermint', 'resend', 'smtp', 'tzmail'])
     assert.deepEqual(r.json.pins, { defaultProvider: 'lettermint', 'agents.confirmMode': 'reply-only', 'agents.firstContactConfirm': false })

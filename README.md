@@ -318,8 +318,10 @@ dsh-mail:
 
 **Convert legacy settings to accounts** (Settings, Mail) turns the virtual
 accounts into editable ones with the same ids. It runs only when you press the
-button and confirm. It writes a backup of `settings.yaml` (when present) and of
-the current settings first. It pins today's agent behaviour (default account,
+button and confirm. It first backs up `settings.yaml`, `settings.yaml.imported`
+and the profile rows (`profiles/*/cordis.patch.yml`) that exist, as
+`<file>.bak-YYYYMMDD-mailv2-convert`, plus a JSON record of the current
+settings with secret values masked. It pins today's agent behaviour (default account,
 confirm mode, first-contact check). Secrets that sat in the settings move into
 `secrets.json`; keys in credential files stay there and are referenced.
 Accounts that use the per-user webmail login are kept as legacy.

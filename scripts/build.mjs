@@ -68,7 +68,19 @@ export function verifyClientBundle(source) {
   if (!exported || typeof exported.apply !== 'function') {
     throw new Error('factory exports ' + JSON.stringify(Object.keys(exported || {})) + ' with no apply(): the loader would reject it and the web UI would not boot')
   }
-  if (JSON.stringify(exported.inject) !== '["betterSidebar","slots"]') throw new Error('inject is ' + JSON.stringify(exported.inject) + ', expected ["betterSidebar","slots"]')
+  // Only core services may be required: an unmet required inject kills the whole web client on DSH 0.2.
+  if (JSON.stringify(exported.inject) !== '["slots"]') throw new Error('inject is ' + JSON.stringify(exported.inject) + ', expected ["slots"] (betterSidebar is injected optionally through ctx.inject)')
+  // Boot smoke: apply() on a host without the sidebar (with and without ctx.inject) must not throw,
+  // and the sidebar must be requested through ctx.inject.
+  const calls = []
+  const base = { effect: fn => fn(), slots: { inject: (_n, f) => { calls.push('slots'); return f() }, register: () => () => {} } }
+  try {
+    exported.apply({ ...base })
+    exported.apply({ ...base, inject: (deps, cb) => { calls.push('inject:' + deps.join(',')); cb({ ...base }) } })
+    exported.apply({ ...base, inject: (deps, cb) => { cb({ ...base, betterSidebar: { registerTab: () => { calls.push('tab'); return () => {} } } }) } })
+  } catch (e) { throw new Error('apply() throws on a host without the sidebar: ' + (e && e.message)) }
+  if (!calls.includes('inject:betterSidebar')) throw new Error('apply() does not request betterSidebar through ctx.inject')
+  if (!calls.includes('tab')) throw new Error('apply() does not register the Mail tab when the sidebar exists')
   if (source.length > BUDGET) throw new Error('bundle is ' + source.length + ' bytes, over the ' + BUDGET + ' byte budget')
 }
 

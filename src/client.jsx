@@ -29,22 +29,37 @@ function SettingsSection() {
   )
 }
 
-export const inject = ['betterSidebar', 'slots']
+// Only `slots` (a core service on every DSH line) is a required inject. The
+// sidebar is optional: a required inject the host cannot satisfy keeps the
+// WHOLE web client from booting on DSH 0.2, so the Mail tab is registered
+// through ctx.inject(['betterSidebar'], ...) only when that service exists.
+export const inject = ['slots']
+
+function tabDescriptor() {
+  return {
+    id: TAB_ID,
+    title: 'Mail',
+    order: 91,
+    single: true,
+    icon: size => I.mail(size),
+    badge: () => (shared.badge > 0 ? shared.badge : null),
+    component: props => <Tab visible={props.visible !== false} />,
+  }
+}
 
 export function apply(ctx) {
   injectCss()
-  if (ctx.betterSidebar && typeof ctx.betterSidebar.registerTab === 'function') {
-    ctx.effect(() => ctx.betterSidebar.registerTab({
-      id: TAB_ID,
-      title: 'Mail',
-      order: 91,
-      single: true,
-      icon: size => I.mail(size),
-      badge: () => (shared.badge > 0 ? shared.badge : null),
-      component: props => <Tab visible={props.visible !== false} />,
-    }), 'dsh-mail: register the Mail sidebar tab')
+  if (typeof ctx.inject === 'function') {
+    try {
+      ctx.inject(['betterSidebar'], (c) => {
+        const sb = c.betterSidebar
+        if (!sb || typeof sb.registerTab !== 'function') { console.warn('[dsh-mail] betterSidebar.registerTab is unavailable; Mail tab not registered'); return }
+        try { c.effect(() => sb.registerTab(tabDescriptor()), 'dsh-mail: register the Mail sidebar tab') }
+        catch (e) { console.warn('[dsh-mail] Mail tab not registered: ' + String((e && e.message) || e)) }
+      })
+    } catch (e) { console.warn('[dsh-mail] sidebar unavailable: ' + String((e && e.message) || e)) }
   } else {
-    console.error('[dsh-mail] ctx.betterSidebar.registerTab is unavailable; Mail tab not registered')
+    console.warn('[dsh-mail] this host has no ctx.inject; Mail tab not registered (Settings, Mail still works)')
   }
   if (ctx.slots && typeof ctx.slots.inject === 'function') {
     ctx.effect(() => {

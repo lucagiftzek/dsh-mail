@@ -108,6 +108,19 @@ await test('reading view: HTML is sanitised, remote image blocked, attachment do
   const m = (await request(p.port, 'GET', '/message?id=' + encodeURIComponent(html.id))).json.message
   assert.ok(!m.srcdoc.includes('<script') && !m.srcdoc.includes('onclick') && m.srcdoc.includes('<b>there</b>'))
   assert.equal(m.blocked, 1)
+  // server-side first: the browser document never names the tracker host as a load target
+  assert.equal(m.proxy, true)
+  assert.ok(!/\ssrc="https?:/.test(m.srcdoc) && !/img-src[^;]*https?:/.test(m.srcdoc))
+  const mi = (await request(p.port, 'GET', '/message?images=1&id=' + encodeURIComponent(html.id))).json.message
+  assert.ok(mi.imagesLoaded, 'images were rewritten to the proxy')
+  assert.match(mi.srcdoc, /src="\/dsh-mail\/api\/img\?u=https%3A%2F%2Ftracker\.example%2Fp\.gif&amp;s=[A-Za-z0-9_-]{32}"/)
+  assert.match(mi.srcdoc, /img-src data: cid: 'self';/)
+  // the signed proxy URL is accepted and the fetch is attempted server-side (tracker.example does not resolve: an error, never a redirect)
+  const src = /src="(\/dsh-mail\/api\/img\?[^"]+)"/.exec(mi.srcdoc)[1].replace(/&amp;/g, '&')
+  const pr = await request(p.port, 'GET', src, { raw: true })
+  assert.ok(pr.status >= 400 && pr.status !== 403 && !pr.headers.location, 'proxy tried the fetch: ' + pr.status + ' ' + pr.text)
+  const forged = await request(p.port, 'GET', src.replace(/s=[^&]+/, 's=' + 'A'.repeat(32)), { raw: true })
+  assert.equal(forged.status, 403)
   const att = rows.find(x => x.subject === 'With attachment')
   const am = (await request(p.port, 'GET', '/message?id=' + encodeURIComponent(att.id))).json.message
   assert.equal(am.attachments.length, 1); assert.equal(am.attachments[0].filename, 'notes.txt')

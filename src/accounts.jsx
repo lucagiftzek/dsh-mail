@@ -82,6 +82,7 @@ function Endpoint({ side, e, set, protocols }) {
           </select>
         </Field>
       </div>
+      {e.security === 'none' ? <div className="mlx-note warn">No encryption: the password and mail travel in clear. Allowed only to a loopback host (a local relay or bridge on this machine).</div> : null}
     </div>
   )
 }
@@ -274,6 +275,7 @@ function AccountForm({ initial, isNew, types, presets, onDone, onCancel }) {
           </div>
           <Check checked={a.allowSelfSigned} onChange={v => set('allowSelfSigned', v)}>Accept a self-signed certificate (only for your own server or a local bridge)</Check>
         </details>
+        {a.allowSelfSigned ? <div className="mlx-note warn" role="alert">Insecure: certificate verification is OFF for this account. The link is still encrypted, but anyone in the path could impersonate the server and read the password. Use it only for your own server or a local bridge such as Proton Mail Bridge.</div> : null}
       </> : null}
       {t === 'tzekos' ? <div className="mlx-grid">
         <Field label="Webmail base URL"><input className="mlx-in mlx-mono" value={(a.api && a.api.baseUrl) || ''} onChange={e => set('api.baseUrl', e.target.value.trim())} placeholder="https://mail.example.com" /></Field>

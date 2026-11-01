@@ -379,17 +379,43 @@ a body; HTML is converted to text.
   handlers, remote images blocked until you ask) and shown in a sandboxed
   frame without script permission under a strict Content Security Policy.
   Relative links are removed (they would point at the DSH origin).
-- Attachments download as attachments with `nosniff`; 25 MB cap.
+- Server-side first: the browser talks only to the DSH host. Every provider
+  connection (IMAP, POP3, SMTP, the HTTP APIs, OAuth token exchange and
+  refresh) is made by the server. In a rendered mail nothing points the
+  browser at another host:
+  - remote images, CSS background images, `@import` and fonts are blocked by
+    default (the count is shown). "Load images" rewrites images to a signed
+    same-origin proxy (`GET /dsh-mail/api/img`): the server fetches them with
+    no cookies, no Referer and a generic User-Agent, public addresses only
+    (the DNS answer is checked and pinned for the connection, redirects are
+    re-checked at every hop, at most 3), ports 80/443/8080/8443, raster images
+    only (magic bytes checked, no SVG), 5 MB and 10 s caps. The frame's CSP
+    allows images only from `data:`, `cid:` and the DSH origin.
+  - `http://` image URLs are upgraded to https. Plain http is used only when
+    `render.allowHttpImages` is on (default off); otherwise such an image
+    stays blocked. There is no silent plaintext fallback.
+  - links point at a signed page on the DSH origin (`GET /dsh-mail/api/link`)
+    that shows the real destination and opens it with
+    `rel="noopener noreferrer"` (no Referer, no opener).
+  - DNS prefetch is off in the frame. Avatars are initials (no Gravatar).
+- Attachments download through the server as attachments with `nosniff`;
+  25 MB cap.
 - HTTP API base URLs (Lettermint, Resend, AgentMail, SendGrid, Tzekos Mail)
   must be https, or plain http to a loopback host, and never link-local; the
-  check runs on save and before Test connection. IMAP, POP3 and SMTP hosts are
-  free (self-hosted mail on the LAN is normal).
+  check runs on save and before Test connection, and again on every request
+  (redirects are not followed, so a redirect cannot downgrade to http). A
+  loopback relay is allowed so a relay at the end of an SSH tunnel (which SSH
+  encrypts) keeps working. IMAP, POP3 and SMTP hosts are free (self-hosted
+  mail on the LAN is normal), but they always need implicit TLS or required
+  STARTTLS/STLS: credentials are never sent on a plaintext socket except to a
+  loopback host, including the legacy `smtp`, `ovh` and `local` providers.
 - The browser half requires only the core `slots` service; the Mail tab is
   added when dsh-better-sidebar is present, and a DSH without it still boots.
 - OAuth tokens are encrypted at rest (AES-256-GCM) and never leave the host;
   the sign-in state is signed, single use and bound to your browser session.
 - TLS certificates are verified unless an account opts in to
-  `allowSelfSigned`; plaintext only to a loopback host.
+  `allowSelfSigned` (default off; the account editor shows it as an
+  "Insecure" warning); plaintext only to a loopback host.
 - Cache, drafts, queue and settings files are created with mode 0600 in a
   0700 directory (`~/.dsh/mail`).
 
@@ -437,6 +463,7 @@ lib/pop3.js            POP3 client
 lib/smtp.js            SMTP (nodemailer), header and recipient checks
 lib/cache.js           node:sqlite cache and threading
 lib/html.js            HTML sanitising for the reading view
+lib/remote.js          server-side image proxy (SSRF guard), link page, https-only API guard
 lib/tools.js           agent tools
 lib/drafts.js          local drafts
 lib/dual-settings.js   settings on DSH 0.1 and 0.2 (vendored, shared)

@@ -3,6 +3,12 @@
  * host as a CSP document and are shown in an iframe sandbox WITHOUT
  * allow-scripts (allow-same-origin only lets the tab measure the height;
  * nothing inside can run).
+ *
+ * The browser never contacts a host named in a mail: remote images load only
+ * through the server's signed image proxy (the message says proxy: true), and
+ * links open the server's link page. A server without the proxy (an older
+ * plugin version still running until the next DSH restart) gets no
+ * "Load images" button at all, so nothing can fall back to a direct load.
  */
 import { useEffect, useRef, useState } from 'react'
 import { apiGet, attachmentUrl } from './api.js'
@@ -66,9 +72,10 @@ function MessageCard({ m, expanded, onToggle, onReply }) {
         {!full && !err ? <div className="mlx-skel" /> : null}
         {full ? <Frame srcdoc={full.srcdoc} /> : null}
         {full && full.blocked > 0 && !images ? <div className="mlx-imgbar">
-          <span>{full.blocked} remote image{full.blocked > 1 ? 's' : ''} blocked for privacy.</span>
-          <button type="button" className="mlx-btn" onClick={() => setImages(true)}>Load images</button>
+          <span>{full.blocked} remote image{full.blocked > 1 ? 's' : ''} blocked for privacy.{full.proxy === true ? '' : ' Loading them through the server needs the updated Mail server (next DSH restart).'}</span>
+          {full.proxy === true ? <button type="button" className="mlx-btn" title="The DSH server fetches the images; your browser never contacts the sender's servers" onClick={() => setImages(true)}>Load images</button> : null}
         </div> : null}
+        {full && images && full.imagesLoaded ? <div className="mlx-imgbar"><span>Images loaded through the server: the senders saw the DSH server, not your device.</span></div> : null}
         {full && (full.attachments || []).length ? <div className="mlx-atts">
           {full.attachments.map(a => (
             <a key={a.part} className="mlx-att" href={attachmentUrl(full.id, a.part)} download={a.filename} rel="noreferrer" title={'Download ' + a.filename}>

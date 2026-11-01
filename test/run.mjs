@@ -91,7 +91,7 @@ await test('crafted HTML renders inert: script, handlers, iframe, javascript: li
   const { html, blocked } = sanitizeMailHtml(evil)
   for (const bad of ['<script', 'onclick', 'onerror', '<iframe', 'javascript:', '<form', '<svg', '<object', '<embed', 'onload', 'alert(', '<meta']) assert.ok(!html.toLowerCase().includes(bad), 'still contains ' + bad)
   assert.ok(html.includes('href="https://ok.example/"') && html.includes('rel="noreferrer noopener"'))
-  assert.equal(blocked, 0)
+  assert.equal(blocked, 1, 'the CSS background image counts as blocked remote content')
   const doc = mailDocument(html)
   assert.ok(doc.includes("default-src 'none'") && doc.includes('img-src data: cid:'))
   assert.ok(!doc.includes('track.example'), 'remote url() in CSS is stripped when images are blocked')
@@ -100,8 +100,12 @@ await test('remote images blocked by default, allowed on request, cid mapped', (
   const src = '<img src="https://img.example/a.png"><img src="cid:logo@x">'
   const a = sanitizeMailHtml(src, { cid: new Map([['logo@x', 'data:image/png;base64,AAAA']]) })
   assert.equal(a.blocked, 1); assert.ok(!/\ssrc="https:\/\/img\.example/.test(a.html)); assert.ok(a.html.includes('data:image/png;base64,AAAA'))
+  // Never a direct load: without the server proxy rewriter, "images: true" still blocks.
   const b = sanitizeMailHtml(src, { images: true })
-  assert.ok(b.html.includes('src="https://img.example/a.png"'))
+  assert.ok(!/\ssrc="https:\/\/img\.example/.test(b.html)); assert.ok(b.html.includes('data-blocked-src="https://img.example/a.png"'))
+  const c = sanitizeMailHtml(src, { images: true, proxy: { img: u => '/dsh-mail/api/img?u=' + encodeURIComponent(u) } })
+  assert.ok(c.html.includes('src="/dsh-mail/api/img?u=https%3A%2F%2Fimg.example%2Fa.png"'))
+  assert.ok(!mailDocument(c.html, { images: true }).match(/img-src[^;]*https?:/), 'CSP img-src never allows a remote scheme')
 })
 
 section('cache.js')
@@ -186,6 +190,7 @@ await import('./dual.test.mjs')
 await import('./phase3.test.mjs')
 await import('./phase4.test.mjs')
 await import('./render.test.mjs')
+await import('./remote.test.mjs')
 await import('./lossless.test.mjs')
 
 rmSync(TMP, { recursive: true, force: true })

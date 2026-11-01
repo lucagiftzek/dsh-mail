@@ -15,7 +15,8 @@
     "docs",
     "skills",
     "README.md",
-    "LICENSE"
+    "LICENSE",
+    "CHANGELOG.md"
   ],
   "scripts": {
     "check": "for f in lib/*.js; do node --check $f || exit 1; done && node test/run.mjs",
@@ -44,9 +45,9 @@
     "react": "^18.2.0"
   },
   "keywords": [
-    "deepseek-harness",
     "dsh",
     "dsh-plugin",
+    "deepseek-harness",
     "dsh-better-sidebar",
     "email",
     "send",
@@ -88,5 +89,9 @@
     "nodemailer": "^10.3.1",
     "sanitize-html": "^2.18.1",
     "yaml": "^2.9.1"
+  },
+  "homepage": "https://github.com/lucagiftzek/dsh-mail#readme",
+  "bugs": {
+    "url": "https://github.com/lucagiftzek/dsh-mail/issues"
   }
 }

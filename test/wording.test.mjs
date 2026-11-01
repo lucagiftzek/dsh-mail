@@ -1,6 +1,6 @@
 /**
  * dsh-mail tests: wording of the send tools. A weaker model must never be able to believe that a call only drafts
- * when it really sent (Afroditi, 1 Nov: reply-only, mail_send without confirm:true delivered, the agent said "draft").
+ * when it really sent (a real case: reply-only mode, mail_send without confirm:true delivered, the agent said "draft").
  * Per mode (all, reply-only, automatic) and per tool: the description and the first words of every result.
  */
 import { strict as assert } from 'node:assert'
@@ -59,7 +59,7 @@ await test('descriptions never claim draft-first unconditionally and state every
   assert.match(T('mail_reply').description, /In every mail mode a call without confirm:true only returns a draft/)
 })
 
-section('wording: reply-only (Afroditi case)')
+section('wording: reply-only (sent but reported as a draft)')
 await test('reply-only: mail_send for a NEW email without confirm SENDS, result starts with SENT', async () => {
   await setMode('reply-only'); sink.length = 0
   const r = await T('mail_send').execute({ account: 'box', to: 'colleague@example.org', subject: 'New mail', text: 'hello' })

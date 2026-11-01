@@ -422,6 +422,15 @@ a body; HTML is converted to text.
 ## Install
 
 ```bash
+dsh plugin --profile web add github:lucagiftzek/dsh-mail
+# then restart dsh-web: the host half loads at start only
+```
+
+The package declares `dsh.bundle`, so `dsh plugin add` lists `dsh-mail` in `dsh.profile.bundles`; the browser bundle `lib/client.js` is committed, so no build step is needed. The npm name `dsh-mail` belongs to an unrelated package: install from GitHub, not from npm.
+
+From a checkout (for development):
+
+```bash
 cd /path/to/dsh-mail
 npm install          # runtime dependencies + esbuild for the bundle
 npm run build        # verified build of src/*.jsx into lib/client.js

@@ -1,6 +1,6 @@
 {
   "name": "@lucagiftzek/dsh-mail",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Mail for agents and humans in the DeepSeek Harness: IMAP, POP3 and SMTP accounts, Gmail with an app password, Tzekos Mail, Lettermint, Resend and AgentMail; a local cache, a Mail sidebar tab with a reading view, an accounts editor in DSH Settings, and mail_* agent tools with draft-first sending.",
   "type": "module",
   "main": "lib/index.js",

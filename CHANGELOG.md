@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.2.1 (2026-11-02)
+
+- **Fix: white text on a white button in dark mode.** On a stock DSH theme in dark mode the host primary colour is near white, but the compose button, primary buttons, the queue badge, brand pills and the All inboxes avatar had hard-coded white text. They now use the host's paired foreground token (`--dsw-alias-label-primary-foreground`, white as the fallback), so they read in light and dark and with custom themes.
+
 ## 0.2.0 (2026-11-01)
 
 A full mail client for DSH, rebuilt around accounts.

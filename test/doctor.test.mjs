@@ -46,7 +46,7 @@ await test('GET /doctor answers 200 with the doctorReport shape and no secret, a
   noSecret('/doctor', r.text)
   const j = r.json
   assert.equal(j.plugin, 'dsh-mail')
-  assert.equal(j.version, '0.2.0')
+  assert.equal(j.version, '0.2.1')
   assert.ok(['ok', 'warn', 'fail'].includes(j.status))
   assert.equal(j.docs, 'docs/TROUBLESHOOTING.md')
   assert.ok(j.host && j.host.node && j.host.settingsMode && j.host.platform)

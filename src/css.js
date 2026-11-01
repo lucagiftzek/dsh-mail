@@ -1,6 +1,6 @@
 /** dsh-mail browser half: one stylesheet, DSH design tokens only (colours below are fallbacks). */
 export const CSS = `
-.mlx{--ok:var(--dsw-alias-state-success-primary,#2e9e5b);--warn:var(--dsw-alias-state-warn-primary,#c98a14);--bad:var(--dsw-alias-state-error-primary,#cf3b3b);--brand:var(--dsw-alias-brand-primary,#4d6bfe);--ink:var(--dsw-alias-label-primary,inherit);--ink2:var(--dsw-alias-label-secondary,inherit);--ink3:var(--dsw-alias-label-tertiary,inherit);--line:var(--dsw-alias-border-l2,rgba(128,128,128,.28));--line1:var(--dsw-alias-border-l1,rgba(128,128,128,.18));--l1:var(--dsw-alias-bg-layer-1,transparent);--l2:var(--dsw-alias-bg-layer-2,rgba(128,128,128,.07));--hov:var(--dsh-alias-interactive-bg-hover,rgba(128,128,128,.12));--bg:var(--dsw-alias-bg-base,var(--dsw-alias-bg-layer-1,#fff));
+.mlx{--ok:var(--dsw-alias-state-success-primary,#2e9e5b);--warn:var(--dsw-alias-state-warn-primary,#c98a14);--bad:var(--dsw-alias-state-error-primary,#cf3b3b);--brand:var(--dsw-alias-brand-primary,#4d6bfe);--on-brand:var(--dsw-alias-label-primary-foreground,#fff);--ink:var(--dsw-alias-label-primary,inherit);--ink2:var(--dsw-alias-label-secondary,inherit);--ink3:var(--dsw-alias-label-tertiary,inherit);--line:var(--dsw-alias-border-l2,rgba(128,128,128,.28));--line1:var(--dsw-alias-border-l1,rgba(128,128,128,.18));--l1:var(--dsw-alias-bg-layer-1,transparent);--l2:var(--dsw-alias-bg-layer-2,rgba(128,128,128,.07));--hov:var(--dsh-alias-interactive-bg-hover,rgba(128,128,128,.12));--bg:var(--dsw-alias-bg-base,var(--dsw-alias-bg-layer-1,#fff));
 display:flex;flex-direction:column;height:100%;min-height:0;overflow:hidden;font:inherit;font-size:13px;color:var(--ink);position:relative;outline:none}
 .mlx *{box-sizing:border-box}
 .mlx button{font:inherit;color:inherit}
@@ -10,11 +10,12 @@ display:flex;flex-direction:column;height:100%;min-height:0;overflow:hidden;font
 .mlx-ib{display:inline-flex;align-items:center;justify-content:center;width:30px;height:30px;border:0;border-radius:7px;background:transparent;cursor:pointer;flex:0 0 auto;position:relative;color:var(--ink2)}
 .mlx-ib:hover{background:var(--hov);color:var(--ink)}
 .mlx-ib[aria-pressed=true]{background:var(--l2);color:var(--brand)}
-.mlx-badge{position:absolute;top:1px;right:0;min-width:15px;height:15px;padding:0 4px;border-radius:8px;background:var(--brand);color:#fff;font-size:9.5px;font-weight:700;line-height:15px;text-align:center}
+.mlx-badge{position:absolute;top:1px;right:0;min-width:15px;height:15px;padding:0 4px;border-radius:8px;background:var(--brand);color:var(--on-brand);font-size:9.5px;font-weight:700;line-height:15px;text-align:center}
 .mlx-chip{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);border-radius:999px;padding:2px 8px 2px 2px;background:transparent;cursor:pointer;max-width:55%;min-width:0}
 .mlx-chip:hover{background:var(--hov)}
 .mlx-chip .n{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600}
 .mlx-av{display:inline-flex;align-items:center;justify-content:center;border-radius:50%;color:#fff;font-weight:700;flex:0 0 auto;letter-spacing:.02em}
+.mlx-av.b{color:var(--on-brand)}
 .mlx-dot{width:8px;height:8px;border-radius:50%;flex:0 0 auto;display:inline-block}
 .mlx-body{flex:1;min-height:0;overflow-y:auto;overflow-x:hidden}
 .mlx-pad{padding:10px}
@@ -24,7 +25,7 @@ display:flex;flex-direction:column;height:100%;min-height:0;overflow:hidden;font
 .mlx-ftitle{display:flex;align-items:center;gap:8px;padding:10px 12px 4px}
 .mlx-ftitle h2{font-size:20px;font-weight:700;margin:0;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .mlx-pill{font-size:10.5px;padding:1px 7px;border-radius:999px;background:var(--l2);border:1px solid var(--line1);font-weight:600;white-space:nowrap;color:var(--ink2)}
-.mlx-pill.b{background:var(--brand);color:#fff;border-color:transparent}
+.mlx-pill.b{background:var(--brand);color:var(--on-brand);border-color:transparent}
 .mlx-search{padding:4px 12px 4px;display:flex;gap:6px;align-items:center}
 .mlx-in{font:inherit;font-size:13px;width:100%;padding:6px 9px;border-radius:8px;border:1px solid var(--line);background:transparent;color:inherit;min-width:0}
 .mlx-in:focus{outline:2px solid var(--brand);outline-offset:-1px}
@@ -57,12 +58,12 @@ textarea.mlx-in{resize:vertical;line-height:1.45}
 .mlx-skel{height:64px;border-bottom:1px solid var(--line1);background:linear-gradient(90deg,var(--l2),var(--hov),var(--l2));background-size:200% 100%;animation:mlxs 1.2s infinite}
 @keyframes mlxs{0%{background-position:200% 0}100%{background-position:-200% 0}}
 .mlx-empty{color:var(--ink3);padding:24px 16px;text-align:center;line-height:1.5}
-.mlx-fab{position:absolute;right:14px;bottom:14px;width:48px;height:48px;border-radius:50%;border:0;background:var(--dsw-alias-button-primary-fill,var(--brand));color:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center;box-shadow:0 3px 10px rgba(0,0,0,.25);z-index:3}
+.mlx-fab{position:absolute;right:14px;bottom:14px;width:48px;height:48px;border-radius:50%;border:0;background:var(--dsw-alias-button-primary-fill,var(--brand));color:var(--on-brand);cursor:pointer;display:flex;align-items:center;justify-content:center;box-shadow:0 3px 10px rgba(0,0,0,.25);z-index:3}
 .mlx-bulk{display:flex;gap:4px;padding:6px 8px;border-top:1px solid var(--line);flex:0 0 auto;align-items:center;flex-wrap:wrap}
 .mlx-btn{font-size:12px;padding:5px 10px;border-radius:7px;border:1px solid var(--line);background:transparent;cursor:pointer;white-space:nowrap}
 .mlx-btn:hover:not(:disabled){background:var(--hov)}
 .mlx-btn:disabled{opacity:.45;cursor:not-allowed}
-.mlx-btn.p{border-color:transparent;background:var(--dsw-alias-button-primary-fill,var(--brand));color:#fff;font-weight:600}
+.mlx-btn.p{border-color:transparent;background:var(--dsw-alias-button-primary-fill,var(--brand));color:var(--on-brand);font-weight:600}
 .mlx-btn.d{border-color:var(--bad);color:var(--bad)}
 .mlx-sheet{position:absolute;left:0;right:0;top:44px;z-index:5;background:var(--bg);border-bottom:1px solid var(--line);box-shadow:0 8px 24px rgba(0,0,0,.18);max-height:70%;overflow:auto}
 .mlx-sheet button.it{display:flex;align-items:center;gap:10px;width:100%;padding:9px 12px;border:0;background:transparent;cursor:pointer;text-align:left}

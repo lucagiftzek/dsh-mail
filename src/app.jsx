@@ -397,7 +397,7 @@ export function MailView({ visible }) {
         {pane !== 'list' ? <button type="button" className="mlx-ib" aria-label="Back" onClick={() => { setPane('list'); setOpen(null) }}>{I.back(16)}</button>
           : <button type="button" className="mlx-ib" aria-label="Folders" onClick={() => setPane('folders')}>{I.menu(16)}</button>}
         <button type="button" className="mlx-chip" aria-label="Switch account" aria-expanded={switcher} onClick={() => setSwitcher(!switcher)}>
-          <span className="mlx-av" style={{ width: 24, height: 24, fontSize: 10, background: selAcc ? selAcc.color : 'var(--brand)' }}>{selAcc ? initials(selAcc.label, selAcc.address) : 'All'}</span>
+          <span className={selAcc ? "mlx-av" : "mlx-av b"} style={{ width: 24, height: 24, fontSize: 10, background: selAcc ? selAcc.color : 'var(--brand)' }}>{selAcc ? initials(selAcc.label, selAcc.address) : 'All'}</span>
           <span className="n">{selAcc ? selAcc.label : 'All inboxes'}</span>
         </button>
         <span className="t" />
@@ -409,7 +409,7 @@ export function MailView({ visible }) {
 
       {switcher && state ? <div className="mlx-sheet" role="menu">
         <button type="button" className="it" aria-current={unified} onClick={() => choose({ account: 'all' })}>
-          <span className="mlx-av" style={{ width: 28, height: 28, fontSize: 10, background: 'var(--brand)' }}>All</span>
+          <span className="mlx-av b" style={{ width: 28, height: 28, fontSize: 10, background: 'var(--brand)' }}>All</span>
           <span className="meta"><div><b>All inboxes</b></div></span>
         </button>
         {accounts.filter(a => a.receive !== 'none').map(a => (

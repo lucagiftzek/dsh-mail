@@ -13,7 +13,7 @@ description: Diagnose and fix dsh-mail problems step by step (accounts and login
 - Stop and report after a fix; verify with the step given.
 
 ## 0. Facts (read-only)
-1. Plugin dir: `node -p "require('path').dirname(require.resolve('dsh-mail/package.json', {paths:[(process.env.DSH_HOME||require('os').homedir()+'/.dsh')+'/profiles/web']}))"` (docs are in its `docs/` folder: `TROUBLESHOOTING.md`, `ERRORS.md`).
+1. Plugin dir: `node -p "require('path').dirname(require.resolve('@lucagiftzek/dsh-mail/package.json', {paths:[(process.env.DSH_HOME||require('os').homedir()+'/.dsh')+'/profiles/web']}))"` (docs are in its `docs/` folder: `TROUBLESHOOTING.md`, `ERRORS.md`).
 2. Doctor: tool `mail_doctor`, or `curl -s <dsh-url>/dsh-mail/api/doctor` (offline, no secrets in the output).
 3. Accounts and permissions: tool `mail_accounts`.
 4. Log lines start with the code: `journalctl -u <your-dsh-unit> | grep 'dsh-mail: MAIL_'` (or the terminal running `dsh web`).

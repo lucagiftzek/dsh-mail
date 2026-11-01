@@ -7,7 +7,7 @@
 # extension point.
 #
 # Install (after human sign-off):
-#   1. add  "dsh-mail": "link:/path/to/dsh-mail"
+#   1. add  "@lucagiftzek/dsh-mail": "link:/path/to/dsh-mail"
 #      to ~/.dsh/profiles/web/package.json dependencies
 #   2. append  dsh-mail  to dsh.profile.bundles
 #   3. pnpm install  in ~/.dsh/profiles/web
@@ -20,4 +20,4 @@
 #   DSH_MAIL_DISABLE=1 in the dsh-web environment (read at apply time).
 - insert:
     - id: dsh-mail
-      name: 'dsh-mail'
+      name: '@lucagiftzek/dsh-mail'

@@ -1,10 +1,13 @@
 # dsh-mail
 
+[![npm](https://img.shields.io/npm/v/%40lucagiftzek%2Fdsh-mail?label=npm)](https://www.npmjs.com/package/@lucagiftzek/dsh-mail)
+
 Mail in the DSH sidebar and mail tools for your agents: IMAP, POP3, SMTP and OAuth2 accounts.
 
 ```bash
 dsh plugin --profile web add dsh-better-sidebar   # the tab host, skip if installed
-dsh plugin --profile web add github:lucagiftzek/dsh-mail
+dsh plugin --profile web add @lucagiftzek/dsh-mail
+# or from GitHub: dsh plugin --profile web add github:lucagiftzek/dsh-mail
 # restart dsh web, then add an account in Settings, Mail
 ```
 
@@ -433,12 +436,15 @@ a body; HTML is converted to text.
 
 ## Install
 
+Install from npm: `dsh plugin --profile web add @lucagiftzek/dsh-mail`, or from GitHub: `dsh plugin --profile web add github:lucagiftzek/dsh-mail`.
+
 ```bash
-dsh plugin --profile web add github:lucagiftzek/dsh-mail
+dsh plugin --profile web add @lucagiftzek/dsh-mail
+# or from GitHub: dsh plugin --profile web add github:lucagiftzek/dsh-mail
 # then restart dsh-web: the host half loads at start only
 ```
 
-The package declares `dsh.bundle`, so `dsh plugin add` lists `dsh-mail` in `dsh.profile.bundles`; the browser bundle `lib/client.js` is committed, so no build step is needed. The npm name `dsh-mail` belongs to an unrelated package: install from GitHub, not from npm.
+The package declares `dsh.bundle`, so `dsh plugin add` lists `@lucagiftzek/dsh-mail` in `dsh.profile.bundles`; the browser bundle `lib/client.js` is committed, so no build step is needed. The npm name `dsh-mail` belongs to an unrelated package: install from GitHub, not from npm.
 
 From a checkout (for development):
 
@@ -450,8 +456,8 @@ npm test             # unit, route security and end-to-end tests
 DSH_GLOBAL_PREFIX=<prefix of a DSH 0.2 install> npm test   # also the DSH 0.2 settings tests
 ```
 
-Add the plugin to the web profile (`"dsh-mail": "link:/path/to/dsh-mail"` in
-`~/.dsh/profiles/web/package.json` dependencies and `dsh-mail` in the bundle
+Add the plugin to the web profile (`"@lucagiftzek/dsh-mail": "link:/path/to/dsh-mail"` in
+`~/.dsh/profiles/web/package.json` dependencies and `@lucagiftzek/dsh-mail` in the bundle
 list), then restart dsh-web. Ask the people using that DSH first: chats run
 inside it. The browser half hot-reloads; the host half loads on restart.
 

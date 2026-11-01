@@ -166,7 +166,7 @@ await test('file mode layers: defaults < settings.yaml.imported block < cordis c
 section('client.js')
 await test('bundle exports apply() + inject through the ModuleLoader factory', () => {
   let exported
-  const window = { __ModuleLoader__: { load: ({ id, factory }) => { assert.equal(id, 'dsh-mail'); exported = factory(name => (name === 'react' ? {} : { jsx() {}, jsxs() {}, Fragment: 'F' })) } } }
+  const window = { __ModuleLoader__: { load: ({ id, factory }) => { assert.equal(id, '@lucagiftzek/dsh-mail'); exported = factory(name => (name === 'react' ? {} : { jsx() {}, jsxs() {}, Fragment: 'F' })) } } }
   runInNewContext(readFileSync(new URL('../lib/client.js', import.meta.url), 'utf8'), { window, console })
   assert.equal(typeof exported?.apply, 'function')
   assert.equal(JSON.stringify(exported.inject), '["slots"]', 'only the core slots service is a required inject')

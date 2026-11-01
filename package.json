@@ -1,5 +1,5 @@
 {
-  "name": "dsh-mail",
+  "name": "@lucagiftzek/dsh-mail",
   "version": "0.2.0",
   "description": "Mail for agents and humans in the DeepSeek Harness: IMAP, POP3 and SMTP accounts, Gmail with an app password, Tzekos Mail, Lettermint, Resend and AgentMail; a local cache, a Mail sidebar tab with a reading view, an accounts editor in DSH Settings, and mail_* agent tools with draft-first sending.",
   "type": "module",
@@ -45,24 +45,24 @@
     "react": "^18.2.0"
   },
   "keywords": [
-    "dsh",
-    "dsh-plugin",
-    "deepseek-harness",
-    "dsh-better-sidebar",
-    "email",
-    "send",
-    "mass-send",
-    "schedule",
-    "lettermint",
     "agentmail",
-    "resend",
-    "ovh",
-    "smtp",
+    "deepseek-harness",
+    "dsh",
+    "dsh-better-sidebar",
+    "dsh-plugin",
+    "email",
     "imap",
-    "pop3",
     "imapflow",
-    "webmail",
-    "mail-client"
+    "lettermint",
+    "mail-client",
+    "mass-send",
+    "ovh",
+    "pop3",
+    "resend",
+    "schedule",
+    "send",
+    "smtp",
+    "webmail"
   ],
   "author": {
     "name": "Loukas \"Luca\" Tzekos",
@@ -93,5 +93,8 @@
   "homepage": "https://github.com/lucagiftzek/dsh-mail#readme",
   "bugs": {
     "url": "https://github.com/lucagiftzek/dsh-mail/issues"
+  },
+  "publishConfig": {
+    "access": "public"
   }
 }

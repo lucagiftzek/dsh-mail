@@ -122,7 +122,7 @@ off). `canRead`, `canSend` and `canMass` narrow it further, and
 `mail_send` without `confirm: true` only creates a draft, shows it, and returns
 a `draftId`; `mail_send({ draftId, confirm: true })` delivers it, or you send it
 from the Queue pane of the tab. Mass and scheduled sends wait for approval in
-the queue. `reply-only` keeps the v0.1 behaviour (only `mail_reply` drafts).
+the queue. `reply-only` keeps the v0.1 behaviour: a NEW `mail_send` / `mail_forward` is SENT IMMEDIATELY with or without `confirm: true`, only `mail_reply` drafts. Tool descriptions state both modes (they cannot follow a live settings change), `mail_accounts` states the current mode in one plain sentence, and every send result starts with `SENT (delivered to the provider now, this is not a draft)`, `DRAFT ONLY, NOTHING WAS SENT` or `SCHEDULED for <time>, not sent yet`.
 
 ### Google and Microsoft (OAuth2)
 
@@ -349,7 +349,7 @@ injected), the plugin reads the row config, the old section and
 | `mail_send` | send one message (`account`/`provider`, `to`, `cc`, `bcc`, `subject`, `text`, `format: markdown`, `html`, `replyTo`, `attachments`, `draftId`, `confirm`) |
 | `mail_mass_send` | CSV-personalised bulk send (`list`, `language`, `footer`, `unsubscribe`, `dryRun`, `delayMs`; returns `campaignId`); staged for review under draft-first |
 | `mail_suppression` | unsubscribes and suppression: `list`, `check`, `campaigns`, `add` / `remove` with `confirm: true` |
-| `mail_forward` | forward a message with a note (`id`, `to`, `note`, `attachments: true` to include the originals); draft first |
+| `mail_forward` | forward a message with a note (`id`, `to`, `note`, `attachments: true` to include the originals); drafted in mode `all`, sent at once in `reply-only` |
 | `mail_send_later` | schedule a send (`sendAt`) or queue it for manual send |
 | `mail_read` | recent messages of any account that can read (`folder`, `unread`, `since`, `domain`, `address`) |
 | `mail_fetch` | one message as text, by composite id `account:folder:uid`, API id or thread id |

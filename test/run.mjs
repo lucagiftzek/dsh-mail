@@ -191,6 +191,7 @@ await import('./phase3.test.mjs')
 await import('./phase4.test.mjs')
 await import('./render.test.mjs')
 await import('./remote.test.mjs')
+await import('./wording.test.mjs')
 await import('./lossless.test.mjs')
 
 rmSync(TMP, { recursive: true, force: true })

@@ -209,7 +209,7 @@ Healthy: `idle` mode `idle` for push accounts, the account row shows `last sync 
 ## 6. A send is refused, rate limited or only drafted
 
 **Likely causes**
-1. **Draft first:** with `agents.confirmMode: all` (the default for new installs) `mail_send` without `confirm: true` returns a draft and a `draftId`; `mail_send({ draftId, confirm: true })` delivers. `reply-only` drafts only `mail_reply`. Scheduled and mass sends wait for approval in the Queue pane. This is by design, not an error.
+1. **Draft first:** with `agents.confirmMode: all` (the default for new installs) `mail_send` without `confirm: true` returns a draft and a `draftId`; `mail_send({ draftId, confirm: true })` delivers. `reply-only` sends a new `mail_send` at once and drafts only `mail_reply`. Read the first words of the result: `SENT (...)` or `DRAFT ONLY, NOTHING WAS SENT`. Scheduled and mass sends wait for approval in the Queue pane. This is by design, not an error.
 2. **First contact:** `agents.firstContactConfirm` (default on): the first message to a recipient domain the account never wrote to or heard from becomes a draft, even in `reply-only` mode.
 3. **Rate limit:** per account `limits.perMinute` and `limits.perDay`; the result has `code MAIL_RATE_LIMITED` and `retryAfterSec`. Mass sends wait for the next minute and stop at the daily cap.
 4. **Mass send above 50 recipients** (`mass.unsubscribeAbove`) needs an unsubscribe address, on every account: `unsubscribe.mailto` or `unsubscribe.publicBaseUrl`, or a custom `unsubscribe` argument. Accounts that cannot set headers (hosted webmail, AgentMail) refuse such batches. `MAIL_UNSUBSCRIBE_REQUIRED`.

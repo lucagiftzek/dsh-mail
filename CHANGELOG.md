@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.2.2 (2026-11-25)
+
+- **Fix: tool results that did not match their declared output schema.** `mail_reply` returned `sent` and `mail_forward` returned `account` (in the draft-first path) without declaring them, so DSH rejected the result with "is not a declared property" even though the mail had already been delivered, which could make an agent send it again (issue #1, thanks @Scrooge2964). Both are declared now. Audit of all 23 tools: `retryAfterSec` (set when a send hits the rate limit) was also undeclared on most tools and is now part of the shared error fields.
+- **Test:** every tool result in the whole suite (success, draft and error paths) is now validated against the tool's declared output schema, with a contract test in `test/schema.test.mjs`.
+
 ## 0.2.1 (2026-11-02)
 
 - **Fix: white text on a white button in dark mode.** On a stock DSH theme in dark mode the host primary colour is near white, but the compose button (whose text also lost to a generic button rule and took the label colour), primary buttons, the queue badge, brand pills and the All inboxes avatar had hard-coded white text. They now use the host's paired foreground token (`--dsw-alias-label-primary-foreground`, white as the fallback), so they read in light and dark and with custom themes.

@@ -4,6 +4,7 @@ import { createHash } from 'node:crypto'
 import { mkdirSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { assertLossless } from './lossless-check.mjs'
+import { schemaProblems } from './schema-check.mjs'
 
 /** Names of the tools whose execute() ran under the lossless check (coverage assertion in test/lossless.test.mjs). */
 export const losslessSeen = new Set()
@@ -11,7 +12,11 @@ export const losslessSeen = new Set()
 function checked(t) {
   const execute = t.execute
   if (typeof execute !== 'function') return t
-  return { ...t, execute: async function (...a) { const out = await execute.apply(this, a); await assertLossless(out, 'tool ' + t.name + ' result'); losslessSeen.add(t.name); return out } }
+  return { ...t, execute: async function (...a) { const out = await execute.apply(this, a); await assertLossless(out, 'tool ' + t.name + ' result'); losslessSeen.add(t.name)
+    // The core rejects a result that does not match the declared output schema, even after the mail was sent.
+    const bad = schemaProblems(t.output && t.output.schema, out, 'value')
+    if (bad.length) throw new Error('tool "' + t.name + '" returned invalid output: ' + bad.join('; '))
+    return out } }
 }
 
 export async function bootPlugin({ dir, settings = {}, withDshSettings = null, extra = {}, strict = false, noSettingsFile = false, estateHome = null, mailboxCreds = null, config = {} }) {

@@ -193,6 +193,7 @@ await import('./render.test.mjs')
 await import('./remote.test.mjs')
 await import('./wording.test.mjs')
 await import('./lossless.test.mjs')
+await import('./schema.test.mjs')
 
 rmSync(TMP, { recursive: true, force: true })
 console.log('\n' + stats.passed + ' passed, ' + stats.failed + ' failed' + (stats.failed ? ': ' + stats.failures.join('; ') : ''))

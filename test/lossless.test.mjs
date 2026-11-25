@@ -37,7 +37,7 @@ for (const [label, settings] of variants) {
       for (const [name, t] of p.tools) {
         for (const args of BOGUS) {
           for (const a of [args, { ...args, account: 'box' }]) {
-            try { await t.execute(a) } catch (e) { if (/not lossless JSON/.test(String(e && e.message))) throw e /* a plain throw is a tool error the core reports itself */ }
+            try { await t.execute(a) } catch (e) { if (/not lossless JSON|returned invalid output/.test(String(e && e.message))) throw e /* a plain throw is a tool error the core reports itself */ }
           }
         }
       }
